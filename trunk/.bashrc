@@ -1,8 +1,10 @@
 echo "########## source $HOME/.bash_functions ##########"
 source $HOME/.bash_functions
 
+export PS1="\033[0;36m[\u]\w>\033[m "
 export JAVA_HOME=/usr/java/jdk1.7.0_60
-export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.2.1/bin:$PATH
+export JS_HOME=$HOME/.JS
+export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.2.1/bin:$JS_HOME/bin:$PATH
 
 [ "$HOSTNAME" != "jinsong" ] && export LANG=C
 

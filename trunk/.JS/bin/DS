@@ -1,0 +1,89 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
+EVAL()
+{
+    echo "#!CMD:[" $@ "]" | awk '{printf "%.256s\n", $0}'
+    eval "$@"
+}
+
+NEWFILE()
+{
+    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
+
+    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
+
+    mkdir -p .$FILE || exit 101
+    if [ -h $FILE ]; then
+rm -f $FILE
+    elif [ -e $FILE ]; then
+echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
+        mv $FILE $REAL_FILE.bak
+    fi
+touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
+}
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+
+while [ "$PWD" != "/" ]; do
+    [ -f install.sh ] && break || cd ..
+done
+[ ! -f install.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
+
+INSTALL_DIR=`pwd`
+MODULES=`pwd`/modules
+
+case $PROGRAM in
+    dsc.stop)
+        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && stopServer.sh all"
+        ;;
+    dsc.start)
+        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && startServer.sh all"
+        ;;
+    dsc.restart)
+        dsc.stop
+        echo "#!CMD:[ rm -rf $MODULES/DocumentServiceConsole/logs/* ]"
+        rm -rf $MODULES/DocumentServiceConsole/logs/*
+        dsc.start
+        ;;
+
+    ds.stop)
+        EVAL $MODULES/DocumentService/bin/startServer.sh stop
+        ;;
+    ds.start)
+        EVAL $MODULES/DocumentService/bin/startServer.sh start
+        ;;
+    ds.clean)
+        echo "#!CMD:[ rm -rf $MODULES/DocumentService/temp/* ]"
+        rm -rf $MODULES/DocumentService/temp/*
+        ;;
+    ds.restart)
+        ds.stop
+        ds.clean
+        echo "#!CMD:[ rm -rf $MODULES/DocumentService/logs/* ]"
+        rm -rf $MODULES/DocumentService/logs/*
+        ds.start
+        ;;
+
+    js.stop)
+        EVAL $MODULES/JobScheduler/bin/startServer.sh stop
+        ;;
+    js.start)
+        EVAL $MODULES/JobScheduler/bin/startServer.sh start
+        ;;
+    js.clean)
+        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/bin/temp/* ]"
+        rm -rf $MODULES/JobScheduler/bin/temp/*
+        rm -rf temp/*   ;#bug?
+        ;;
+    js.restart)
+        js.stop
+        js.clean
+        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/bin/{*.log,*.out} ]"
+        rm -rf $MODULES/JobScheduler/bin/{*.log,*.out}
+        rm -rf jobscheduler.* ;#bug?
+        js.start
+        ;;
+esac
+

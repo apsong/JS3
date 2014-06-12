@@ -1,0 +1,36 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+if [ $# -ne 1 ]; then
+echo "Error: Usage: $PROGRAM <filename>" 1>&2
+    exit 1
+fi
+
+LINK_FILE=$1
+if [ ! -h "$LINK_FILE" ]; then
+echo "Error: '$LINK_FILE' doesn't exist as a symbolic link!" 1>&2
+    exit 2
+fi
+
+BCKUP_DIR=.$LINK_FILE
+LAST_FILE=`ls $BCKUP_DIR/*#$LINK_FILE* 2>/dev/null | tail -1`
+[ -n "$LAST_FILE" ] && rm -f $LAST_FILE
+
+REAL_FILE=`ls $BCKUP_DIR/*#$LINK_FILE* 2>/dev/null | tail -1`
+case "$REAL_FILE" in
+    *.bak)
+        rm -f $LINK_FILE
+        mv $REAL_FILE $LINK_FILE
+        echo "$LINK_FILE"
+        ;;
+    "")
+        rm -rf $BCKUP_DIR $LINK_FILE
+        echo ""
+        ;;
+    *)
+        rm -f $LINK_FILE
+        ln -s $REAL_FILE $LINK_FILE
+        echo "$REAL_FILE"
+        ;;
+esac

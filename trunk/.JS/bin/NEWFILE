@@ -1,0 +1,32 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+if [ $# -ne 1 -a $# -ne 2 ]; then
+echo "Error: Usage: $PROGRAM <filename> [linkname]" 1>&2
+    exit 1
+fi
+
+NOW=`NOW`
+[ $# -eq 1 ] && LINK_FILE=$1 || LINK_FILE=$2
+
+mkdir -p .$1 || exit 2
+
+if [ -f "$1" -a ! -h "$1" ] || [ -d "$1" ]; then
+BCKUP_FILE=".$1/$NOW#$1.bak"
+    echo "Note: '$1' exists and is not a symbolic file. Renamed to '$BCKUP_FILE'" 1>&2
+    mv $1 $BCKUP_FILE
+    sleep 1; NOW=`NOW` ;#Use a newer NOW to make sure NEWFILE is newer than BCKUP_FILE
+fi
+
+REAL_FILE=".$1/$NOW#$1"
+
+case "$PROGRAM" in
+    NEWFILE|NF)
+        touch $REAL_FILE;;
+    CLONEFILE|CF)
+        [ -f $1 ] && cp $1 $REAL_FILE || touch $REAL_FILE;;
+esac
+rm -f $1 $LINK_FILE
+ln -s $REAL_FILE $LINK_FILE
+echo $REAL_FILE

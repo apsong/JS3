@@ -21,9 +21,18 @@ proc incr0 {_var} {
 }
 
 cd modules/DocumentService/temp
+
+foreach JOB [glob -nocomplain JOB*] {
+    set mtime [file mtime $JOB]
+    set JOBs($mtime) $JOB
+}
+set min_mtime [lindex [lsort -integer [array names JOBs]] 0]
+#puts "First file: $JOBs($min_mtime)  [clock format $min_mtime -format {%Y-%m-%d %H:%M:%S}]"
+set shift [expr {$min_mtime % 60}]
+
 foreach dir [glob -nocomplain job*] {
     foreach pdf [glob -nocomplain $dir/*.pdf] {
-        set mtime [expr {[file mtime $pdf] / 60 * 60}]
+        set mtime [expr {([file mtime $pdf] - $shift) / 60 * 60}]
         incr0 pdfs($mtime)
         incr0 count
     }
@@ -36,10 +45,11 @@ set mtimes [lsort [array names pdfs]]
 set first [lindex $mtimes 0]
 set last [lindex $mtimes end]
 
-puts "TOTAL: $count pdf / [expr {($last - $first)/60+1}] minute(s)"
+puts "TOTAL: $count pdf / [expr {($last - $first)/60+1}] minutes"
 puts "=============================="
 
 for {set t $first} {$t <= $last} {incr t 60} {
-    set mtime_str [clock format $t -format {%Y-%m-%d %H:%M:%S}]
-    puts "$mtime_str  :[format %8d [expr {[info exists pdfs($t)] ? $pdfs($t) : 0}]]"
+    set mtime_str [clock format [expr {$t + $shift}] -format {%Y-%m-%d %H:%M:%S}]
+    set count [format %7d [expr {[info exists pdfs($t)] ? $pdfs($t) : 0}]]
+    puts "$mtime_str  : $count"
 }

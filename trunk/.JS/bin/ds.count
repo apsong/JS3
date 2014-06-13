@@ -1,0 +1,38 @@
+#! /usr/bin/tclsh
+
+while { [pwd] != "/" } {
+    if {[file exists "modules"]} {
+        break
+    }
+    cd ..
+}
+if {![file exists "modules"]} {
+    puts stderr "Error: Invalid work directory. Unable to find modules."
+    exit 1
+}
+
+proc incr0 {_var} {
+    upvar 1 $_var var
+    if {[info exists var]} {
+        incr var
+    } else {
+        set var 1
+    }
+}
+
+cd modules/DocumentService/temp
+foreach dir [glob -nocomplain job*] {
+    foreach pdf [glob -nocomplain $dir/*.pdf] {
+        set mtime [expr {[file mtime $pdf] / 60 * 60}]
+        incr0 pdfs($mtime)
+        break
+    }
+}
+
+set mtimes [lsort [array names pdfs]]
+set first [lindex $mtimes 0]
+set last [lindex $mtimes end]
+for {set t $first} {$t <= $last} {incr t 60} {
+    set mtime_str [clock format $t -format {%Y-%m-%d %H:%M}]
+    puts "$mtime_str  :[format %8d [expr {[info exists pdfs($t)] ? $pdfs($t) : 0}]]"
+}

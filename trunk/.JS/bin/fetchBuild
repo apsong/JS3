@@ -27,8 +27,15 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 
 BUILD_BASE=/mnt/birt-build/nmb-server/rolling-build
+
+case $1 in
+    --check)
+        EVAL ls $BUILD_BASE/*/*.tar.gz
+        exit 0
+        ;;
+esac
+
 NEW_BUILD=`ls $BUILD_BASE | tail -1` || exit 1
 EVAL mkdir /TEST/$NEW_BUILD || exit 2
 BUILD_PATH=`ls $BUILD_BASE/$NEW_BUILD/*.tar.gz | tail -1` || exit 3
 EVAL "cd /TEST/$NEW_BUILD && tar xzvf $BUILD_PATH" || exit 4
-EVAL "rm -f /TEST/LATEST && ln -s /TEST/$NEW_BUILD /TEST/LATEST"

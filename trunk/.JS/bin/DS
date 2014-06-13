@@ -36,10 +36,10 @@ MODULES=`pwd`/modules
 
 case $PROGRAM in
     dsc.stop)
-        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && stopServer.sh all"
+        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && ./stopServer.sh all && cd -"
         ;;
     dsc.start)
-        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && startServer.sh all"
+        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && ./startServer.sh all && cd -"
         ;;
     dsc.restart)
         dsc.stop
@@ -85,5 +85,45 @@ case $PROGRAM in
         rm -rf jobscheduler.* ;#bug?
         js.start
         ;;
+
+    zk.stop)
+        EVAL "cd $MODULES/zookeeper/ && ./stopServer.sh && cd -"
+        ;;
+    zk.start)
+        EVAL "cd $MODULES/zookeeper/ && ./startServer.sh && cd -"
+        ;;
+    zk.restart)
+        zk.stop
+        echo "#!CMD:[ rm -rf $MODULES/zookeeper/*.out ]"
+        rm -rf $MODULES/zookeeper/*.out
+        zk.start
+        ;;
+
+    se.stop)
+        EVAL "$MODULES/SearchEngine/bin/startServer.sh stop"
+        ;;
+    se.start)
+        EVAL "$MODULES/SearchEngine/bin/startServer.sh start"
+        ;;
+    se.restart)
+        se.stop
+        echo "#!CMD:[ rm -rf $MODULES/SearchEngine/bin/{*.out,*.log} ]"
+        rm -rf $MODULES/SearchEngine/bin/{*.out,*.log}
+        rm -rf searchEngine.log searchengine.out
+        se.start
+        ;;
+
+    mg.stop)
+        EVAL "$MODULES/mongodb/mongodb/bin/mongod -f $MODULES/mongodb/config/mongod.conf --shutdown"
+        ;;
+    mg.start)
+        EVAL "$MODULES/mongodb/mongodb/bin/mongod -f $MODULES/mongodb/config/mongod.conf"
+        ;;
+    mg.restart)
+        mg.stop
+        EVAL "rm -rf $MODULES/mongodb/mongodb/*.log"
+        mg.start
+        ;;
+
 esac
 

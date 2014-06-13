@@ -25,14 +25,21 @@ foreach dir [glob -nocomplain job*] {
     foreach pdf [glob -nocomplain $dir/*.pdf] {
         set mtime [expr {[file mtime $pdf] / 60 * 60}]
         incr0 pdfs($mtime)
-        break
+        incr0 count
     }
+}
+if {![array exists pdfs]} {
+    return
 }
 
 set mtimes [lsort [array names pdfs]]
 set first [lindex $mtimes 0]
 set last [lindex $mtimes end]
+
+puts "TOTAL: $count pdf / [expr {($last - $first)/60+1}] minute(s)"
+puts "=============================="
+
 for {set t $first} {$t <= $last} {incr t 60} {
-    set mtime_str [clock format $t -format {%Y-%m-%d %H:%M}]
+    set mtime_str [clock format $t -format {%Y-%m-%d %H:%M:%S}]
     puts "$mtime_str  :[format %8d [expr {[info exists pdfs($t)] ? $pdfs($t) : 0}]]"
 }

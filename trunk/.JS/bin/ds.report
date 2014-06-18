@@ -22,9 +22,7 @@ proc incr0 {_var} {
 
 cd modules/DocumentService/temp
 
-set lastJob [lindex [lsort [glob -nocomplain JOB*SUBJOB0]] end]
-regsub -- {SUBJOB0} $lastJob {SUBJOB*} lastJobPattern
-foreach JOB [glob -nocomplain $lastJobPattern] {
+foreach JOB [glob -nocomplain JOB*] {
     set mtime [file mtime $JOB]
     set JOBs($mtime) $JOB
 }
@@ -36,7 +34,7 @@ if {$min_mtime == ""} {
 #puts "First file: $JOBs($min_mtime)  [clock format $min_mtime -format {%Y-%m-%d %H:%M:%S}]"
 set shift [expr {$min_mtime % 60}]
 
-foreach dir [glob -nocomplain job$lastJobPattern] {
+foreach dir [glob -nocomplain job*] {
     foreach pdf [glob -nocomplain $dir/*.pdf] {
         set mtime [expr {([file mtime $pdf] - $shift) / 60 * 60}]
         incr0 pdfs($mtime)

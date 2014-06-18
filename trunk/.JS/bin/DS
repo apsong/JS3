@@ -65,6 +65,14 @@ case $PROGRAM in
         rm -rf $MODULES/DocumentService/logs/*
         ds.start
         ;;
+    ds2.restart)
+        EVAL $MODULES/DocumentService2/bin/startServer.sh stop
+        echo "#!CMD:[ rm -rf $MODULES/DocumentService2/temp/* ]"
+        rm -rf $MODULES/DocumentService2/temp/*
+        echo "#!CMD:[ rm -rf $MODULES/DocumentService2/logs/* ]"
+        rm -rf $MODULES/DocumentService2/logs/*
+        EVAL $MODULES/DocumentService2/bin/startServer.sh start
+        ;;
 
     js.stop)
         EVAL $MODULES/JobScheduler/bin/startServer.sh stop

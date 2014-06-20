@@ -22,8 +22,8 @@ proc incr0 {_var} {
 
 cd modules/DocumentService/temp
 
-set lastJob [lindex [lsort [glob -nocomplain JOB*SUBJOB0]] end]
-regsub -- {SUBJOB0} $lastJob {SUBJOB*} lastJobPattern
+set lastJob [lindex [lsort [glob -nocomplain {JOB*SUBJOB[01]} ]] end]
+regsub -- {SUBJOB[01]} $lastJob {SUBJOB*} lastJobPattern
 foreach JOB [glob -nocomplain $lastJobPattern] {
     set mtime [file mtime $JOB]
     set JOBs($mtime) $JOB

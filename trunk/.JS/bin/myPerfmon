@@ -1,0 +1,105 @@
+#! /usr/bin/tclsh
+
+set PROGRAM [file tail $argv0]
+
+#if {$argc < 2} {
+#    puts stderr "Usage: $PROGRAM HOST PORT SECONDS \[TICKLEN: default to 100\]"
+#    exit 1
+#}
+set HOST [lindex $argv 0]
+set PORT [lindex $argv 1]
+set SECONDS [lindex $argv 2]
+set TICKLEN [lindex $argv 3]
+if {$HOST == ""} {set HOST localhost}
+if {$PORT == ""} {set PORT 4444}
+if {$SECONDS == ""} {set SECONDS 3600}
+if {$SECONDS <= 0} {exit 0} ;#Something like 'hs 1.10i'
+if {$TICKLEN == ""} {set TICKLEN 60}
+
+if {[catch {socket $HOST $PORT} chan]} {
+    puts stderr "Failed to connect to $HOST:$PORT : $chan"
+    exit 2
+}
+
+proc LIST2average {LIST} {
+    if {[llength $LIST] == 0} {
+        return "-"
+    }
+    set sum 0
+    foreach E $LIST {
+        set sum [expr {$sum + $E}]
+    }
+    return [format "%.1f" [expr {$sum/[llength $LIST]}]]
+}
+proc LIST2line {LIST name average} {
+    set lst {}
+    set lines {}
+    foreach E $LIST {
+        set V [format "%2.0f" $E]; if {[string length $V] > 2} { set V ">H" }
+        lappend lst $V
+        if {[llength $lst] == 25} {
+            lappend lines "[join $lst { }]"
+            set lst {}
+        }
+    }
+    if {[llength $lst] > 0} {
+        lappend lines "[join $lst { }]"
+        set lst {}
+    }
+    return [format "%11s=%5s %s" $name $average ([join $lines "\n\t\t "])/[llength $LIST]]
+}
+
+fconfigure $chan -buffering line -blocking 0
+after 1000
+puts $chan "metrics:cpu\tdisks"
+
+set aveCPUs {}
+set aveDQLs {}
+set CPU {}
+set DQL {}
+set begin [expr [clock seconds] - 3] ;#Bring forward every output for 3s
+set next [expr $begin + $TICKLEN]
+set end [expr $begin + $SECONDS]
+while {[after 1000; set now [clock seconds]] <= $end} {
+    set line [string trim [gets $chan]]
+    if {$line == ""} { continue }
+    lappend CPU [lindex $line 0]
+    set dql [lindex $line 1]; if {$dql < 0} { set dql 0 }
+    lappend DQL $dql
+    if {$now >= $next} {
+        while {$now >= $next} { incr next $TICKLEN }
+
+        set aveCPU [LIST2average $CPU]
+        set aveDQL [LIST2average $DQL]
+        lappend aveCPUs $aveCPU
+        lappend aveDQLs $aveDQL
+        puts [LIST2line $CPU "CPU" $aveCPU]
+        if {$aveDQL >= 1} {
+            puts [LIST2line $DQL "DiskQ" $aveDQL]
+        } else {
+            puts [format "%11s=%5s" "DiskQ" $aveDQL]
+        }
+        set CPU {}
+        set DQL {}
+    }
+}
+if {[llength $CPU] > 0} {
+    set aveCPU [LIST2average $CPU]
+    set aveDQL [LIST2average $DQL]
+    lappend aveCPUs $aveCPU
+    lappend aveDQLs $aveDQL
+    puts [LIST2line $CPU "CPU" $aveCPU]
+    puts [LIST2line $DQL "DiskQ" $aveDQL]
+    set CPU {}
+    set DQL {}
+}
+puts $chan "exit"
+while {[gets $chan line] >= 0} {}
+close $chan
+
+after 1000
+set aveCPUs [lrange $aveCPUs 1 end-1]
+if {[llength $aveCPUs] > 0} {
+    puts [format "Average from Tick 2 to Tick %.0f(when all users are active): CPU= %2.1f DiskQ= %.1f" \
+            [expr {$SECONDS*1.0/$TICKLEN-1}] [LIST2average $aveCPUs] [LIST2average $aveDQLs]]
+}

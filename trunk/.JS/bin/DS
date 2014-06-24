@@ -133,5 +133,14 @@ case $PROGRAM in
         mg.start
         ;;
 
+    all.start)
+        EVAL "./uninstall.sh -startAll"
+        ;;
+    all.stop)
+        EVAL "./uninstall.sh -stopAll"
+        ;;
+    all.restart)
+        EVAL "./uninstall.sh -restartAll"
+        ;;
 esac
 

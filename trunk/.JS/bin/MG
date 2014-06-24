@@ -1,0 +1,113 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+ 
+#DB=192.168.99.141:37017/test
+DB=192.168.99.98:27017/perf
+U=test
+P=test
+INTERVAL=60
+
+now_seconds()
+{
+    date "+%s"
+}
+time_str()
+{
+    date -d "@$1" "+%T"
+}
+mg_countBetween()
+{
+    _begin=$1
+    _end=$2
+    mongo $DB -u $U -p $P --quiet --eval \
+        "db.fs.files.find({time: {\$gte: $_begin, \$lt: $_end}}).count()"
+}
+mg_clean()
+{
+    mongo $DB -u $U -p $P --quiet --eval \
+        'db.fs.files.drop(); db.fs.chunks.drop()' | egrep -v "^(true|false)$"
+}
+mg_aggr()
+{
+    mongo $DB -u $U -p $P --quiet --eval \
+        'db.fs.files.aggregate([{$group: {_id: "$time", count: {$sum: 1}}}, {$sort: {_id: 1}}]).forEach(printjson)'
+}
+
+mg_monitor()
+{
+    LAST=0; NOW=`now_seconds`
+
+    NUM_0=0
+    TOTAL=0
+    while [ 1 ]; do
+        COUNT=`mg_countBetween $LAST $NOW`
+        [ $LAST -ne 0 ] && TOTAL=`expr $TOTAL + $COUNT`
+        printf "[`time_str $NOW`] + %4d  = $TOTAL\n" $COUNT
+        [ "$COUNT" -eq "0" ] && NUM_0=`expr $NUM_0 + 1`
+        [ "$NUM_0" -ge "60" ] && break
+        sleep $INTERVAL
+
+        LAST=$NOW; NOW=`expr $NOW + $INTERVAL`
+    done | tee `NEWFILE $PROGRAM.log`
+}
+
+mg_count()
+{
+    mg_aggr | sed -e 's/,//' | awk -v interval=$INTERVAL '
+        BEGIN {
+            end=0; count_interval=0; total=0;
+        }
+        {
+            if (NF != 8) {
+                print
+                exit
+            }
+
+            SECONDS=$4
+            COUNT=$7
+
+            total += COUNT
+
+            if (end == 0) {
+                begin = SECONDS
+                end   = begin + 60
+                count_interval += COUNT
+                printf("[%s] %6d\n", strftime("%T", begin), 0)
+            } else if (SECONDS < end) {
+                count_interval += COUNT
+            } else {
+                printf("[%s] %6d\n", strftime("%T", end), count_interval)
+
+                while (SECONDS >= end) {
+                    begin = end
+                    end  += interval
+                    count_interval = 0
+                    if (SECONDS >= end) {
+                        printf("[%s] %6d\n", strftime("%T", end), 0)
+                    }
+                }
+                count_interval += COUNT
+            }
+        }
+        END {
+            printf("[%s] %6d\n", strftime("%T", SECONDS), count_interval)
+            print "================="
+            printf("TOTAL: %10d\n", total)
+        }
+    '
+}
+
+case $PROGRAM in
+    mg.count)
+        mg_count
+        ;;
+    mg.clean)
+        mg_clean
+        ;;
+    mg.monitor)
+        mg_clean
+        mg_monitor
+        ;;
+esac
+

@@ -12,7 +12,7 @@ set SECONDS [lindex $argv 2]
 set TICKLEN [lindex $argv 3]
 if {$HOST == ""} {set HOST localhost}
 if {$PORT == ""} {set PORT 4444}
-if {$SECONDS == ""} {set SECONDS 3600}
+if {$SECONDS == ""} {set SECONDS 360000}
 if {$SECONDS <= 0} {exit 0} ;#Something like 'hs 1.10i'
 if {$TICKLEN == ""} {set TICKLEN 60}
 

@@ -57,12 +57,14 @@ case $PROGRAM in
     ds.clean)
         echo "#!CMD:[ rm -rf $MODULES/DocumentService/temp/* ]"
         rm -rf $MODULES/DocumentService/temp/*
+        EVAL ls $MODULES/DocumentService/temp/
         ;;
     ds.restart)
         ds.stop
         ds.clean
         echo "#!CMD:[ rm -rf $MODULES/DocumentService/logs/* ]"
         rm -rf $MODULES/DocumentService/logs/*
+        EVAL ls $MODULES/DocumentService/logs/
         ds.start
         ;;
     ds2.restart)
@@ -81,16 +83,16 @@ case $PROGRAM in
         EVAL $MODULES/JobScheduler/bin/startServer.sh start
         ;;
     js.clean)
-        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/bin/temp/* ]"
-        rm -rf $MODULES/JobScheduler/bin/temp/*
-        rm -rf temp/*   ;#bug?
+        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/temp/* ]"
+        #echo "#!CMD:[ rm -rf $MODULES/JobScheduler/logs/* ]"
+        rm -rf $MODULES/JobScheduler/temp/*
+        #rm -rf $MODULES/JobScheduler/logs/*
+        EVAL ls $MODULES/JobScheduler/temp/
+        #EVAL ls $MODULES/JobScheduler/logs/
         ;;
     js.restart)
         js.stop
-        js.clean
-        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/bin/{*.log,*.out} ]"
-        rm -rf $MODULES/JobScheduler/bin/{*.log,*.out}
-        rm -rf jobscheduler.* ;#bug?
+        #js.clean
         js.start
         ;;
 

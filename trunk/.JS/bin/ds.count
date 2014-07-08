@@ -1,12 +1,14 @@
 #! /usr/bin/tclsh
 
-while { [pwd] != "/" } {
-    if {[file exists "modules"]} {
+set DIR $::env(PWD)
+while { $DIR != "/" } {
+    if {[file exists "$DIR/modules"]} {
         break
     }
-    cd ..
+    set DIR [file dirname $DIR]
+    cd $DIR
 }
-if {![file exists "modules"]} {
+if {![file exists "$DIR/modules"]} {
     puts stderr "Error: Invalid work directory. Unable to find modules."
     exit 1
 }
@@ -20,9 +22,9 @@ proc incr0 {_var} {
     }
 }
 
-cd modules/DocumentService/temp
+cd $DIR/modules/DocumentService/temp
 
-set lastJob [lindex [lsort [glob -nocomplain {JOB*SUBJOB[01]} ]] end]
+set lastJob [lindex [lsort [glob -types f -nocomplain {*SUBJOB[01]} ]] end]
 regsub -- {SUBJOB[01]} $lastJob {SUBJOB*} lastJobPattern
 foreach JOB [glob -nocomplain $lastJobPattern] {
     set mtime [file mtime $JOB]

@@ -35,7 +35,7 @@ done
 
 echo "DocumentService Config:"
 echo "======================="
-EVAL "grep listeningServer.*WorkerThreads modules/DocumentService/config/server.cfg"
+EVAL "egrep 'listening.*Threads|db.host|db.port|db.dbName' modules/DocumentService/config/server.cfg"
 
 echo
-ds.count
+mg.count

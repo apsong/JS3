@@ -2,11 +2,36 @@
 
 PROGRAM=`basename $0`
  
+usage()
+{
+    echo "Usage: $PROGRAM [192.168.99.98:27017/perf] [-u test] [-p test] [-i|--interval 60]"
+    echo "       $PROGRAM -h|--help"
+}
+
+[ -f ~/.mg ] && . ~/.mg
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        -u)
+            shift; U=$1;;
+        -p)
+            shift; P=$1;;
+        -i)
+            shift; INTERVAL=$1;;
+        *:*/*)
+            DB=$1;;
+        -h|--help)
+            usage; exit 0;;
+        *)
+            usage; exit 1;;
+    esac
+    shift
+done
 #DB=192.168.99.141:37017/test
-DB=192.168.99.98:27017/perf
-U=test
-P=test
-INTERVAL=60
+[ "$DB" = "" ] && DB=192.168.99.98:27017/perf
+[ "$U"  = "" ] && U=test
+[ "$P"  = "" ] && P=test
+[ "$INTERVAL" = "" ] && INTERVAL=60
 
 now_seconds()
 {
@@ -49,7 +74,8 @@ mg_monitor()
         sleep $INTERVAL
 
         LAST=$NOW; NOW=`expr $NOW + $INTERVAL`
-    done | tee `NEWFILE $PROGRAM.log`
+    done
+    #done | tee `NEWFILE $PROGRAM.log`
 }
 
 mg_count()
@@ -99,6 +125,9 @@ mg_count()
 }
 
 case $PROGRAM in
+    mg.aggr)
+        mg_aggr
+        ;;
     mg.count)
         mg_count
         ;;
@@ -106,7 +135,6 @@ case $PROGRAM in
         mg_clean
         ;;
     mg.monitor)
-        mg_clean
         mg_monitor
         ;;
 esac

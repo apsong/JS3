@@ -1,4 +1,4 @@
-echo "########## source $HOME/.bash_functions ##########"
+[ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_functions ##########"
 source $HOME/.bash_functions
 
 export PS1="\033[0;36m[\u]\w>\033[m "

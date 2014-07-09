@@ -26,13 +26,13 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 }
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 
-while [ "$PWD" != "/" ]; do
-    [ -f install.sh ] && break || cd ..
+DIR=$PWD
+while [ "$DIR" != "/" ]; do
+    [ -f $DIR/install.sh ] && break || DIR=`dirname $DIR`
 done
-[ ! -f install.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
+[ ! -f $DIR/install.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
 
-INSTALL_DIR=`pwd`
-MODULES=`pwd`/modules
+MODULES=$DIR/modules
 
 case $PROGRAM in
     dsc.stop)
@@ -67,14 +67,6 @@ case $PROGRAM in
         EVAL ls $MODULES/DocumentService/logs/
         ds.start
         ;;
-    ds2.restart)
-        EVAL $MODULES/DocumentService2/bin/startServer.sh stop
-        echo "#!CMD:[ rm -rf $MODULES/DocumentService2/temp/* ]"
-        rm -rf $MODULES/DocumentService2/temp/*
-        echo "#!CMD:[ rm -rf $MODULES/DocumentService2/logs/* ]"
-        rm -rf $MODULES/DocumentService2/logs/*
-        EVAL $MODULES/DocumentService2/bin/startServer.sh start
-        ;;
 
     js.stop)
         EVAL $MODULES/JobScheduler/bin/startServer.sh stop
@@ -84,15 +76,15 @@ case $PROGRAM in
         ;;
     js.clean)
         echo "#!CMD:[ rm -rf $MODULES/JobScheduler/temp/* ]"
-        #echo "#!CMD:[ rm -rf $MODULES/JobScheduler/logs/* ]"
         rm -rf $MODULES/JobScheduler/temp/*
-        #rm -rf $MODULES/JobScheduler/logs/*
         EVAL ls $MODULES/JobScheduler/temp/
-        #EVAL ls $MODULES/JobScheduler/logs/
         ;;
     js.restart)
         js.stop
-        #js.clean
+        js.clean
+        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/logs/* ]"
+        rm -rf $MODULES/JobScheduler/logs/*
+        EVAL ls $MODULES/JobScheduler/logs/
         js.start
         ;;
 
@@ -136,13 +128,23 @@ case $PROGRAM in
         ;;
 
     all.start)
-        EVAL "./uninstall.sh -startAll"
+        EVAL "cd $DIR && ./uninstall.sh -startAll && cd -"
         ;;
     all.stop)
-        EVAL "./uninstall.sh -stopAll"
+        EVAL "cd $DIR && ./uninstall.sh -stopAll && cd -"
         ;;
     all.restart)
-        EVAL "./uninstall.sh -restartAll"
+        EVAL "cd $DIR && ./uninstall.sh -restartAll && cd -"
+        ;;
+
+    my.postInstall)
+        cp -v /TEST/redis* $MODULES/DocumentServiceConsole/redis-2.8.12/src
+        DS_CFG=$MODULES/DocumentService/config/server.cfg
+        if [ ! -f $DS_CFG.bak ]; then
+            cp $DS_CFG $DS_CFG.bak
+            sed -e 's/listeningServer.pool.maxWorkerThreads=.*$/&\ndebugMode=true/' $DS_CFG.bak > $DS_CFG
+        fi
+        EVAL diff $DS_CFG.bak $DS_CFG
         ;;
 esac
 

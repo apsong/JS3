@@ -13,12 +13,12 @@ if {![file exists "$DIR/modules"]} {
     exit 1
 }
 
-proc incr0 {_var} {
+proc incr0 {_var {step 1}} {
     upvar 1 $_var var
     if {[info exists var]} {
-        incr var
+        incr var $step
     } else {
-        set var 1
+        set var $step
     }
 }
 
@@ -41,15 +41,16 @@ set shift [expr {$min_mtime % 60}]
 foreach dir [glob -nocomplain job$lastJobPattern] {
     foreach pdf [glob -nocomplain $dir/*.pdf] {
         set mtime [expr {([file mtime $pdf] - $shift) / 60 * 60}]
-        incr0 pdfs($mtime)
+        incr0 pdf_num($mtime)
+        incr0 pdf_size($mtime) [file size $pdf]
         incr0 count
     }
 }
-if {![array exists pdfs]} {
+if {![array exists pdf_num]} {
     return
 }
 
-set mtimes [lsort [array names pdfs]]
+set mtimes [lsort [array names pdf_num]]
 set first [lindex $mtimes 0]
 set last [lindex $mtimes end]
 
@@ -58,6 +59,7 @@ puts "=============================="
 
 for {set t $first} {$t <= $last} {incr t 60} {
     set mtime_str [clock format [expr {$t + $shift}] -format {%Y-%m-%d %H:%M:%S}]
-    set count [format %7d [expr {[info exists pdfs($t)] ? $pdfs($t) : 0}]]
-    puts "$mtime_str  : $count"
+    set count [format %7d [expr {[info exists pdf_num($t)] ? $pdf_num($t) : 0}]]
+    set size  [format %7d [expr {[info exists pdf_size($t)] ? $pdf_size($t)/1024 : 0}]]
+    puts "$mtime_str  : $count (size: $size KB)"
 }

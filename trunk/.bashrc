@@ -1,5 +1,7 @@
 [ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_functions ##########"
 source $HOME/.bash_functions
+[ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_ds_functions #######"
+source $HOME/.bash_ds_functions
 
 export PS1="[\u]\w> "
 export JAVA_HOME=/opt/jdk1.7.0_60

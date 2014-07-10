@@ -31,8 +31,10 @@ while [ "$DIR" != "/" ]; do
     [ -f $DIR/install.sh ] && break || DIR=`dirname $DIR`
 done
 [ ! -f $DIR/install.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
-
 MODULES=$DIR/modules
+DS_CFG=$MODULES/DocumentService/config/server.cfg
+JS_CFG=$MODULES/JobScheduler/config/server.cfg
+DS_SH=$MODULES/DocumentService/bin/startServer.sh
 
 case $PROGRAM in
     dsc.stop)
@@ -66,6 +68,25 @@ case $PROGRAM in
         rm -rf $MODULES/DocumentService/logs/*
         EVAL ls $MODULES/DocumentService/logs/
         ds.start
+        ;;
+    ds.debugMode)
+        case "$1" in
+            true)
+                sed -i -e 's/debugMode=.*/debugMode=true/' $DS_CFG
+                ;;
+            false)
+                sed -i -e 's/debugMode=.*/debugMode=false/' $DS_CFG
+                ;;
+            "")
+                ;;
+            *)
+                echo 1>&2 "Error: Invalid parameter '$1'"
+                echo 1>&2
+                echo 1>&2 "Usage: $PROGRAM [true|false]"
+                exit 1
+                ;;
+        esac
+        EVAL grep 'debugMode' $DS_CFG
         ;;
 
     js.stop)
@@ -131,20 +152,61 @@ case $PROGRAM in
         EVAL "cd $DIR && ./uninstall.sh -startAll && cd -"
         ;;
     all.stop)
+        ds.clean
+        echo "#!CMD:[ rm -rf $MODULES/DocumentService/logs/* ]"
+        rm -rf $MODULES/DocumentService/logs/*
+        EVAL ls $MODULES/DocumentService/logs/
+
+        js.clean
+        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/logs/* ]"
+        rm -rf $MODULES/JobScheduler/logs/*
+        EVAL ls $MODULES/JobScheduler/logs/
+
         EVAL "cd $DIR && ./uninstall.sh -stopAll && cd -"
         ;;
     all.restart)
+        ds.clean
+        echo "#!CMD:[ rm -rf $MODULES/DocumentService/logs/* ]"
+        rm -rf $MODULES/DocumentService/logs/*
+        EVAL ls $MODULES/DocumentService/logs/
+
+        js.clean
+        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/logs/* ]"
+        rm -rf $MODULES/JobScheduler/logs/*
+        EVAL ls $MODULES/JobScheduler/logs/
+
         EVAL "cd $DIR && ./uninstall.sh -restartAll && cd -"
         ;;
 
-    my.postInstall)
+    all.postInstall)
         cp -v /TEST/redis* $MODULES/DocumentServiceConsole/redis-2.8.12/src
-        DS_CFG=$MODULES/DocumentService/config/server.cfg
+        echo
+
         if [ ! -f $DS_CFG.bak ]; then
-            cp $DS_CFG $DS_CFG.bak
+            cp -v $DS_CFG $DS_CFG.bak
             sed -e 's/listeningServer.pool.maxWorkerThreads=.*$/&\ndebugMode=true/' $DS_CFG.bak > $DS_CFG
         fi
         EVAL diff $DS_CFG.bak $DS_CFG
+        echo
+
+        sed -i -e 's@jobscheduler.dataDir=.*$@jobscheduler.dataDir=/TEST/data@' $JS_CFG
+        EVAL grep "jobscheduler.dataDir=" $JS_CFG
+        echo
+
+        rm -rf $MODULES/DocumentService/repository
+        ln -sv /TEST/repository $MODULES/DocumentService/
+        rm -rf $MODULES/DocumentService/reportEngine/resource
+        ln -sv /TEST/resource $MODULES/DocumentService/reportEngine
+        echo
+
+        rm -v $MODULES/DocumentService/reportEngine/plugins/PavoDataEngine*.jar
+        cp -v /TEST/PavoDataEngine*.jar $MODULES/DocumentService/reportEngine/plugins
+        echo
+
+        if [ `grep -c "^JVMFLAGS=" $DS_SH` -eq 0 ]; then
+            sed -i -e '2aJVMFLAGS="-Xms2g -Xmx2g -XX:PermSize=100m"' $DS_SH
+        fi
+        EVAL grep "^JVMFLAGS=" $DS_SH
         ;;
 esac
 

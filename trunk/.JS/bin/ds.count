@@ -24,21 +24,24 @@ proc incr0 {_var {step 1}} {
 
 cd $DIR/modules/DocumentService/temp
 
-set lastJob [lindex [lsort [glob -types f -nocomplain {*SUBJOB[01]} ]] end]
-regsub -- {SUBJOB[01]} $lastJob {SUBJOB*} lastJobPattern
-foreach JOB [glob -nocomplain $lastJobPattern] {
+foreach JOB [glob -type f -nocomplain *JOB*] {
+    set job [regsub -- {SUBJOB.*$} $JOB {}]
     set mtime [file mtime $JOB]
-    set JOBs($mtime) $JOB
+    if {![info exists last_job] || ($job > $last_job)} {
+        set last_job $job
+        set min_mtime $mtime
+    } elseif {$min_mtime > $mtime} {
+        set min_mtime $mtime
+    }
 }
-set min_mtime [lindex [lsort -integer [array names JOBs]] 0]
-if {$min_mtime == ""} {
+if {![info exists min_mtime]} {
     puts stderr "Error: No pdf found in [pwd]"
     exit 2
 }
 #puts "First file: $JOBs($min_mtime)  [clock format $min_mtime -format {%Y-%m-%d %H:%M:%S}]"
 set shift [expr {$min_mtime % 60}]
 
-foreach dir [glob -nocomplain job$lastJobPattern] {
+foreach dir [glob -nocomplain job$last_job*] {
     foreach pdf [glob -nocomplain $dir/*.pdf] {
         set mtime [expr {([file mtime $pdf] - $shift) / 60 * 60}]
         incr0 pdf_num($mtime)

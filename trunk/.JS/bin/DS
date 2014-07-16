@@ -179,8 +179,8 @@ case $PROGRAM in
         ;;
 
     all.postInstall)
-        cp -v /TEST/redis* $MODULES/DocumentServiceConsole/redis-2.8.12/src
-        echo
+#        cp -v /TEST/redis* $MODULES/DocumentServiceConsole/redis-2.8.12/src
+#        echo
 
         if [ ! -f $DS_CFG.bak ]; then
             cp -v $DS_CFG $DS_CFG.bak

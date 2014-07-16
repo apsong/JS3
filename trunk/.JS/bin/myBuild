@@ -30,12 +30,13 @@ BUILD_BASE=/mnt/birt-build/nmb-server/rolling-build
 
 case $1 in
     --check)
-        EVAL ls $BUILD_BASE/*-*/*.tar.gz
+        EVAL find $BUILD_BASE/*-*/
         exit 0
         ;;
 esac
 
-NEW_BUILD=`ls $BUILD_BASE/ | grep '[0-9]-[0-9]' | tail -1` || exit 1
+NEW_BUILD=`ls $BUILD_BASE/ | grep '[0-9]-[0-9]' | tail -1`
+[ -n "$NEW_BUILD" ] || exit 1
 EVAL mkdir /TEST/$NEW_BUILD || exit 2
-BUILD_PATH=`ls $BUILD_BASE/$NEW_BUILD/*.tar.gz | tail -1` || exit 3
+BUILD_PATH=`ls $BUILD_BASE/$NEW_BUILD/*redhat.tar.gz | tail -1` || exit 3
 EVAL "cd /TEST/$NEW_BUILD && tar xzvf $BUILD_PATH" || exit 4

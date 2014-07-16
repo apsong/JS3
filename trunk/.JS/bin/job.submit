@@ -1,0 +1,38 @@
+#! /usr/bin/tclsh
+source [file join [file dirname $argv0] jsonUtil.tcl]
+##################################################################################
+set PROGRAM [file tail $argv0]
+
+set HOST localhost
+set PORT 9091
+set URL_BASE https://$HOST:$PORT
+
+jsonPost R $URL_BASE/api?method=user.authorize {"userid":"test","password":"test"}
+set token [dict get $R response token]
+
+switch -exact -- $PROGRAM {
+    job.list {
+        jsonGet R $URL_BASE/api?token=$token&method=job.info.query
+    }
+    job.submit {
+        jsonPost R $URL_BASE/api?method=job.submit&name=CSV2PDF&token=$token {
+            "options" : [
+                    {"name" : "localFile", "value" : "u1m0d1.csv"},
+                    {"name" : "reportPath", "value" : "Daily_report.rptdesign"},
+                    {"name" : "hasHeader", "value" : true},
+                    {"name" : "hasDataType", "value" : false},
+                    {"name" : "sep", "value" : ","},
+                    {"name" : "keyExpr", "value" : "'{1}' + '{5}'"},
+                    {"name" : "encoding", "value" : "gbk"}
+                ],
+            "parameters" : [
+                    {"name" : "p1", "value" : 10},
+                    {"name" : "p2", "value" : "abc"}
+                ]
+        }
+    }
+    default {
+        error "($PROGRAM)Error: unknown command '$PROGRAM'"
+    }
+}
+puts [jsonFormat $R]

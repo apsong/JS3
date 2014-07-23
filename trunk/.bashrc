@@ -7,6 +7,7 @@ export PS1="[\u]\w> "
 export JAVA_HOME=/opt/jdk1.7.0_60
 export JS_HOME=$HOME/.JS
 export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.2.1/bin:$JS_HOME/bin:$JS_HOME/tea:$PATH
+export PATH=/opt/node-v0.10.29-linux-x64/bin:$PATH
 
 [ "$HOSTNAME" != "jinsong" ] && export LANG=C
 
@@ -15,9 +16,9 @@ alias l.='ls -d .*'
 alias ll='ls -l'
 alias h='history'
 alias js='cd $HOME/.JS/bin'
-alias .h='cd $HOME/HSIM/bin'
-alias .t='cd $HOME/TRACE/bin'
+alias tea='cd $HOME/.JS/tea'
 alias vi='vim'
+alias jp='underscore print'
 
 ####################### reset PATH ###########################
 _PATH=

@@ -58,7 +58,7 @@ case $PROGRAM in
         ;;
     ds.clean)
         echo "#!CMD:[ rm -rf $MODULES/DocumentService/temp/* ]"
-        rm -rf $MODULES/DocumentService/temp/*
+        find $MODULES/DocumentService/temp/ -maxdepth 1 -exec rm -rf {} \;
         EVAL ls $MODULES/DocumentService/temp/
         ;;
     ds.restart)
@@ -193,15 +193,15 @@ case $PROGRAM in
         EVAL grep "jobscheduler.dataDir=" $JS_CFG
         echo
 
-        rm -rf $MODULES/DocumentService/repository
-        ln -sv /TEST/repository $MODULES/DocumentService/
+        #rm -rf $DIR/repository
+        ln -sfv $MODULES/DocumentService/repository $DIR
         rm -rf $MODULES/DocumentService/reportEngine/resource
         ln -sv /TEST/resource $MODULES/DocumentService/reportEngine
         echo
 
-        rm -v $MODULES/DocumentService/reportEngine/plugins/PavoDataEngine*.jar
-        cp -v /TEST/PavoDataEngine*.jar $MODULES/DocumentService/reportEngine/plugins
-        echo
+        #rm -v $MODULES/DocumentService/reportEngine/plugins/PavoDataEngine*.jar
+        #cp -v /TEST/PavoDataEngine*.jar $MODULES/DocumentService/reportEngine/plugins
+        #echo
 
         if [ `grep -c "^JVMFLAGS=" $DS_SH` -eq 0 ]; then
             sed -i -e '2aJVMFLAGS="-Xms2g -Xmx2g -XX:PermSize=100m"' $DS_SH

@@ -5,6 +5,7 @@ package require http
 package require tls
 package require json
 package require log
+package require base64
 
 ::http::register https 443 ::tls::socket
 
@@ -62,23 +63,44 @@ set token [dict get [::json::json2dict $R] response token]
 
 switch -exact -- $PROGRAM {
     job.submit {
-        jsonPost R $URL_BASE/api?method=job.submit&name=CSV2PDF&token=$token {
+        set csv u1d1.csv
+        set rpt daily.rptdesign
+
+        foreach arg $argv {
+            switch -glob -- $arg {
+                *.csv       { set csv [regsub {/TEST/data/} $arg {}] }
+                *.rptdesign { set rpt $arg }
+                default     { error "($PROGRAM)Error: unknown argument '$arg'" }
+            }
+        }
+        jsonPost R $URL_BASE/api?method=job.submit&name=CSV2PDF&token=$token [subst -nocommands {
             "options" : [
-                    {"name" : "localFile", "value" : "u1d1.csv"},
-                    {"name" : "reportPath", "value" : "daily.rptdesign"},
+                    {"name" : "localFile", "value" : "$csv"},
+                    {"name" : "reportPath", "value" : "$rpt"},
                     {"name" : "hasHeader", "value" : true},
-                    {"name" : "hasDataType", "value" : false},
+                    {"name" : "hasDataType", "value" : true},
                     {"name" : "sep", "value" : ","},
                     {"name" : "keyExpr", "value" : "if({0}==''){{2}}else{{0}}"},
                     {"name" : "encoding", "value" : "utf-8"}
                 ],
             "parameters" : []
-        }
+        }]
     }
     doc.query {
-        jsonPost R $URL_BASE/api?method=doc.query&token=$token "
-            'querytext':'{[lindex $argv 0]}'
-        "
+        jsonPost R $URL_BASE/api?method=doc.query&token=$token [subst {
+            "query":{[lindex $argv 0]}
+        }]
+    }
+    doc.download {
+        set id [regsub -- {id=} [lindex $argv 0] {}]
+        jsonGet R $URL_BASE/api?method=$PROGRAM&id=[regsub -- {id=} [lindex $argv 0] {}]&token=$token
+        set b64str [dict get [::json::json2dict $R] response]
+        set pdf "/tmp/$id.pdf"
+        set fd [open $pdf w]
+        puts -nonewline $fd [::base64::decode $b64str]
+        close $fd
+        log::log critical "($PROGRAM) file is downloaded to $pdf"
+        exit
     }
     default {
         if {$argc == 0} {
@@ -95,6 +117,6 @@ switch -exact -- $PROGRAM {
     }
 }
 
-set fd [open "|underscore print" w]
+set fd [open "|underscore print --color" w]
 puts $fd $R
 close $fd

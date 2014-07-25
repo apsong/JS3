@@ -18,7 +18,7 @@ alias h='history'
 alias js='cd $HOME/.JS/bin'
 alias tea='cd $HOME/.JS/tea'
 alias vi='vim'
-alias jp='underscore print'
+alias jp='underscore print --color'
 
 ####################### reset PATH ###########################
 _PATH=

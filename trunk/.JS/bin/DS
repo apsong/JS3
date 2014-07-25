@@ -32,6 +32,7 @@ while [ "$DIR" != "/" ]; do
 done
 [ ! -f $DIR/install.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
 MODULES=$DIR/modules
+SERVICE=$DIR/service.sh
 DS_CFG=$MODULES/DocumentService/config/server.cfg
 JS_CFG=$MODULES/JobScheduler/config/server.cfg
 DS_SH=$MODULES/DocumentService/bin/startServer.sh
@@ -51,14 +52,14 @@ case $PROGRAM in
         ;;
 
     ds.stop)
-        EVAL $MODULES/DocumentService/bin/startServer.sh stop
+        $SERVICE -stop a
         ;;
     ds.start)
-        EVAL $MODULES/DocumentService/bin/startServer.sh start
+        $SERVICE -start a
         ;;
     ds.clean)
         echo "#!CMD:[ rm -rf $MODULES/DocumentService/temp/* ]"
-        find $MODULES/DocumentService/temp/ -maxdepth 1 -exec rm -rf {} \;
+        find $MODULES/DocumentService/temp/ -mindepth 1 -maxdepth 1 -exec rm -rf {} \;
         EVAL ls $MODULES/DocumentService/temp/
         ;;
     ds.restart)
@@ -204,7 +205,7 @@ case $PROGRAM in
         #echo
 
         if [ `grep -c "^JVMFLAGS=" $DS_SH` -eq 0 ]; then
-            sed -i -e '2aJVMFLAGS="-Xms2g -Xmx2g -XX:PermSize=100m"' $DS_SH
+            sed -i -e '2aJVMFLAGS="-Xms2g -Xmx2g -XX:PermSize=200m"' $DS_SH
         fi
         EVAL grep "^JVMFLAGS=" $DS_SH
         ;;

@@ -4,7 +4,7 @@ PROGRAM=`basename $0`
  
 usage()
 {
-    echo "Usage: $PROGRAM [192.168.99.98:27017/perf] [-u test] [-p test] [-i|--interval 60]"
+    echo "Usage: $PROGRAM [192.168.99.98:40000/perf] [-u test] [-p test] [-i|--interval 60]"
     echo "       $PROGRAM -h|--help"
 }
 
@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 #DB=192.168.99.141:37017/test
-[ "$DB" = "" ] && DB=192.168.99.98:27017/perf
+[ "$DB" = "" ] && DB=192.168.99.98:40000/perf
 [ "$U"  = "" ] && U=test
 [ "$P"  = "" ] && P=test
 [ "$INTERVAL" = "" ] && INTERVAL=60
@@ -58,6 +58,30 @@ mg_aggr()
     mongo $DB -u $U -p $P --quiet --eval \
         'db.fs.files.aggregate([{$group: {_id: "$time", count: {$sum: 1}}}, {$sort: {_id: 1}}]).forEach(printjson)'
 }
+mg_total()
+{
+    while [ 1 ]; do
+        TOTAL=`mongo $DB -u $U -p $P --quiet --eval 'db.fs.files.count()'`
+        NOW=`date "+%Y-%m-%d %H:%M:%S"`
+        [ -z "$LAST" ] && diff=0 || diff=`expr $TOTAL - $LAST`
+        case "$diff" in
+            -*) echo "[$NOW] $diff => $TOTAL";;
+            *) echo "[$NOW] +$diff => $TOTAL";;
+        esac
+
+        [ -n "$LAST" -a $diff -eq 0 ] && break
+        LAST=$TOTAL
+        sleep 10
+    done
+}
+mg_findColumn()
+{
+    [ -z "$1" ] && KEY=metadata.parameter.merchantid || KEY="$1"
+    FILTER=`echo $KEY | sed -e 's/^.*\.//'`
+    mongo $DB -u $U -p $P --quiet --eval \
+        "db.fs.files.find({},{_id:0,'$KEY':1}).forEach(printjson)" | awk -F\" "/$FILTER/{print \$4}"
+}
+
 
 mg_monitor()
 {
@@ -128,6 +152,9 @@ case $PROGRAM in
     mg.aggr)
         mg_aggr
         ;;
+    mg.total)
+        mg_total
+        ;;
     mg.count)
         mg_count
         ;;
@@ -136,6 +163,9 @@ case $PROGRAM in
         ;;
     mg.monitor)
         mg_monitor
+        ;;
+    mg.findColumn)
+        mg_findColumn
         ;;
 esac
 

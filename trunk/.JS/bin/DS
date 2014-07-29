@@ -138,21 +138,23 @@ case $PROGRAM in
         ;;
 
     mg.stop)
-        EVAL "$MODULES/mongodb/mongodb/bin/mongod -f $MODULES/mongodb/config/mongod.conf --shutdown"
+        EVAL "cd $DIR && ./service.sh -stop e && cd -"
         ;;
     mg.start)
-        EVAL "$MODULES/mongodb/mongodb/bin/mongod -f $MODULES/mongodb/config/mongod.conf"
+        EVAL "cd $DIR && ./service.sh -start e && cd -"
         ;;
     mg.restart)
         mg.stop
-        EVAL "rm -rf $MODULES/mongodb/mongodb/*.log"
+        EVAL "rm -rf $MODULES/mongodb/logs/*.log"
         mg.start
         ;;
 
     all.start)
-        EVAL "cd $DIR && ./uninstall.sh -startAll && cd -"
+        EVAL "cd $DIR && ./service.sh -startAll && cd -"
         ;;
     all.stop)
+        EVAL "cd $DIR && ./service.sh -stopAll && cd -"
+
         ds.clean
         echo "#!CMD:[ rm -rf $MODULES/DocumentService/logs/* ]"
         rm -rf $MODULES/DocumentService/logs/*
@@ -162,21 +164,10 @@ case $PROGRAM in
         echo "#!CMD:[ rm -rf $MODULES/JobScheduler/logs/* ]"
         rm -rf $MODULES/JobScheduler/logs/*
         EVAL ls $MODULES/JobScheduler/logs/
-
-        EVAL "cd $DIR && ./uninstall.sh -stopAll && cd -"
         ;;
     all.restart)
-        ds.clean
-        echo "#!CMD:[ rm -rf $MODULES/DocumentService/logs/* ]"
-        rm -rf $MODULES/DocumentService/logs/*
-        EVAL ls $MODULES/DocumentService/logs/
-
-        js.clean
-        echo "#!CMD:[ rm -rf $MODULES/JobScheduler/logs/* ]"
-        rm -rf $MODULES/JobScheduler/logs/*
-        EVAL ls $MODULES/JobScheduler/logs/
-
-        EVAL "cd $DIR && ./uninstall.sh -restartAll && cd -"
+        all.stop
+        all.start
         ;;
 
     all.postInstall)
@@ -185,7 +176,7 @@ case $PROGRAM in
 
         if [ ! -f $DS_CFG.bak ]; then
             cp -v $DS_CFG $DS_CFG.bak
-            sed -e 's/listeningServer.pool.maxWorkerThreads=.*$/&\ndebugMode=true/' $DS_CFG.bak > $DS_CFG
+            sed -e 's/listeningServer.pool.maxWorkerThreads=.*$/&\ndebugMode=false/' $DS_CFG.bak > $DS_CFG
         fi
         EVAL diff $DS_CFG.bak $DS_CFG
         echo
@@ -195,7 +186,7 @@ case $PROGRAM in
         echo
 
         #rm -rf $DIR/repository
-        ln -sfv $MODULES/DocumentService/repository $DIR
+        ln -sfv $MODULES/DocumentService/repository $DIR/../repository
         rm -rf $MODULES/DocumentService/reportEngine/resource
         ln -sv /TEST/resource $MODULES/DocumentService/reportEngine
         echo

@@ -1,6 +1,8 @@
 #! /usr/bin/tclsh
 
 ##################################################################################
+source [file join [pwd] [file dirname $argv0] util.tcl]
+
 package require http
 package require tls
 package require json
@@ -59,7 +61,10 @@ set PORT 9091
 set URL_BASE https://$HOST:$PORT
 
 jsonPost R $URL_BASE/api?method=user.authorize {"userid":"test","password":"test"}
-set token [dict get [::json::json2dict $R] response token]
+if {[catch {dict get [::json::json2dict $R] response token} token]} {
+    log::log error "($PROGRAM) $R"
+    exit 1
+}
 
 switch -exact -- $PROGRAM {
     job.submit {
@@ -91,9 +96,32 @@ switch -exact -- $PROGRAM {
             "query":{[lindex $argv 0]}
         }]
     }
+    doc.queryRandom {
+        log::log critical "\[[nowtime]\] ($PROGRAM) Preparing keys for query..."
+        set fd [open "|mg.findColumn | shuf -n 1000000 --random-source=/opt/random1M"]
+        while {[gets $fd id] >= 0} {
+            lappend ids $id
+        }
+        log::log critical "\[[nowtime]\] ($PROGRAM) Query start~"
+        set i 0
+        foreach id $ids {
+            if {$i % 1000 == 0} {
+                jsonPost R $URL_BASE/api?method=doc.query&token=$token [subst {
+                    "query":{"metadata.parameter.merchantid":"$id"}
+                }]
+                puts "\[[nowtime]\] ($PROGRAM) $i: $id:\t$R"
+            } else {
+                jsonPost {} $URL_BASE/api?method=doc.query&token=$token [subst {
+                    "query":{"metadata.parameter.merchantid":"$id"}
+                }]
+            }
+            incr i
+        }
+        exit
+    }
     doc.download {
         set id [regsub -- {id=} [lindex $argv 0] {}]
-        jsonGet R $URL_BASE/api?method=$PROGRAM&id=[regsub -- {id=} [lindex $argv 0] {}]&token=$token
+        jsonGet R $URL_BASE/api?method=$PROGRAM&id=$id&token=$token
         set b64str [dict get [::json::json2dict $R] response]
         set pdf "/tmp/$id.pdf"
         set fd [open $pdf w]
@@ -101,6 +129,17 @@ switch -exact -- $PROGRAM {
         close $fd
         log::log critical "($PROGRAM) file is downloaded to $pdf"
         exit
+    }
+    job.info.query - job.cancel - job.delete {
+        if {$argc == 0} {
+            jsonGet R $URL_BASE/api?method=$PROGRAM&token=$token
+        } else {
+            set id [regsub -- {id=} [lindex $argv 0] {}]
+            if {![string match JOB* $id]} {
+                set id [format "JOB%010d" $id]
+            }
+            jsonGet R $URL_BASE/api?method=$PROGRAM&id=$id&token=$token
+        }
     }
     default {
         if {$argc == 0} {

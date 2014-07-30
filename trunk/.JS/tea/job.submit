@@ -97,19 +97,20 @@ switch -exact -- $PROGRAM {
         }]
     }
     doc.queryRandom {
-        log::log critical "\[[nowtime]\] ($PROGRAM) Preparing keys for query..."
-        set fd [open "|mg.findColumn | shuf -n 1000000 --random-source=/opt/random1M"]
+        log::log critical "\[[nowtimeAdd]\] ($PROGRAM) Preparing keys for query..."
+        set fd [open "|mg.findColumn | shuf -n 1000000 --random-source=/opt/random10M"]
         while {[gets $fd id] >= 0} {
             lappend ids $id
         }
-        log::log critical "\[[nowtime]\] ($PROGRAM) Query start~"
+        close $fd
+        log::log critical "\[[nowtimeAdd]\] ($PROGRAM) Query start~"
         set i 0
         foreach id $ids {
             if {$i % 1000 == 0} {
                 jsonPost R $URL_BASE/api?method=doc.query&token=$token [subst {
                     "query":{"metadata.parameter.merchantid":"$id"}
                 }]
-                puts "\[[nowtime]\] ($PROGRAM) $i: $id:\t$R"
+                puts "\[[nowtimeAdd]\] $i => ID: $id  RESP: $R"
             } else {
                 jsonPost {} $URL_BASE/api?method=doc.query&token=$token [subst {
                     "query":{"metadata.parameter.merchantid":"$id"}

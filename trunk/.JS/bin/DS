@@ -39,10 +39,11 @@ DS_SH=$MODULES/DocumentService/bin/startServer.sh
 
 case $PROGRAM in
     dsc.stop)
-        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && ./stopServer.sh all && cd -"
+        $SERVICE -stop b
         ;;
     dsc.start)
-        EVAL "cd $MODULES/DocumentServiceConsole/bin/ && ./startServer.sh all && cd -"
+        #EVAL "cd $MODULES/DocumentServiceConsole/bin/ && ./startServer.sh all && cd -"
+        $SERVICE -start b
         ;;
     dsc.restart)
         dsc.stop

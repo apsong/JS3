@@ -1,5 +1,6 @@
-proc nowtime {} {
-    return [clock format [clock seconds] -format %T]
+proc nowtime {{seconds -1}} {
+    if {$seconds < 0} { set seconds [clock seconds] }
+    return [clock format $seconds -format %T]
 }
 proc nowtimeAdd {} {
     set now [clock seconds]

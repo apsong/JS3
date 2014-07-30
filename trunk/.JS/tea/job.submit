@@ -29,7 +29,7 @@ proc jsonGet {_RESULT url} {
 
     set tok [::http::geturl $url]
     if {[::http::status $tok] != "ok"} {
-        error "Failed to \[jsonPost $url $json\] with returned tok:\n{[array get $tok]}"
+        error "Failed to \[jsonGet $url\] with returned tok:\n{[array get $tok]}"
     }
     if {$_RESULT != ""} {
         set RESULT [::http::data $tok]
@@ -42,7 +42,7 @@ proc jsonPost {_RESULT url json} {
     log::log info "POST: $url\nJSON: {$json}"
     upvar 1 $_RESULT RESULT
 
-    set tok [::http::geturl $url -type application/json -query "{$json}"]
+    set tok [::http::geturl $url -keepalive 1 -type application/json -query "{$json}"]
     if {[::http::status $tok] != "ok"} {
         error "Failed to \[jsonPost $url $json\] with returned tok:\n{[array get $tok]}"
     }
@@ -97,26 +97,45 @@ switch -exact -- $PROGRAM {
         }]
     }
     doc.queryRandom {
-        log::log critical "\[[nowtimeAdd]\] ($PROGRAM) Preparing keys for query..."
-        set fd [open "|mg.findColumn | shuf -n 1000000 --random-source=/opt/random10M"]
+        puts "\[[nowtimeAdd]\] ($PROGRAM) Preparing keys for query..."
+        #set fd [open "|mg.findColumn | shuf -n 1000000 --random-source=/opt/random10M"]
+        set fd [open "|mg.findColumn | shuf -n 1000000"]
         while {[gets $fd id] >= 0} {
             lappend ids $id
         }
         close $fd
-        log::log critical "\[[nowtimeAdd]\] ($PROGRAM) Query start~"
-        set i 0
-        foreach id $ids {
-            if {$i % 1000 == 0} {
-                jsonPost R $URL_BASE/api?method=doc.query&token=$token [subst {
-                    "query":{"metadata.parameter.merchantid":"$id"}
-                }]
-                puts "\[[nowtimeAdd]\] $i => ID: $id  RESP: $R"
-            } else {
-                jsonPost {} $URL_BASE/api?method=doc.query&token=$token [subst {
-                    "query":{"metadata.parameter.merchantid":"$id"}
-                }]
+        puts "\[[nowtimeAdd]\] ($PROGRAM) Query start~"
+        set len [llength $ids]
+
+        set interval 10
+        set next [clock seconds]
+        for {set i 0; set count 0} {true} {incr i; incr count} {
+            set id [lindex $ids [expr {$i%$len}]]
+            
+            if {$i%1==0} {
+                set now [clock seconds]
+                if {$now >= $next} {
+                    jsonPost R $URL_BASE/api?method=doc.query&token=$token [subst {
+                        "query":{"metadata.parameter.merchantid":"$id"}
+                    }]
+                    set filenames {}
+                    if {[catch {
+                        foreach resp [dict get [::json::json2dict $R] response] {
+                            lappend filenames [dict get $resp filename]
+                        }
+                    }]} {
+                        set filenames $R
+                    }
+                    puts "\[[nowtime $now]\] $count => ID: $id  FILE: $filenames"
+                    set count 0
+                    set next [expr {[clock seconds] + 10}]
+                    continue
+                }
             }
-            incr i
+
+            jsonPost {} $URL_BASE/api?method=doc.query&token=$token [subst {
+                "query":{"metadata.parameter.merchantid":"$id"}
+            }]
         }
         exit
     }

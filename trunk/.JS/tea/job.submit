@@ -56,7 +56,7 @@ proc jsonPost {_RESULT url json} {
 ##################################################################################
 set PROGRAM [file tail $argv0]
 
-set HOST localhost
+set HOST 192.168.99.241
 set PORT 9091
 set URL_BASE https://$HOST:$PORT
 
@@ -68,28 +68,36 @@ if {[catch {dict get [::json::json2dict $R] response token} token]} {
 
 switch -exact -- $PROGRAM {
     job.submit {
-        set csv u1d1.csv
         set rpt daily.rptdesign
 
         foreach arg $argv {
             switch -glob -- $arg {
-                *.csv       { set csv [regsub {/TEST/data/} $arg {}] }
+                *.csv       { lappend csvs [regsub {/TEST/data/} $arg {}] }
                 *.rptdesign { set rpt $arg }
                 default     { error "($PROGRAM)Error: unknown argument '$arg'" }
             }
         }
-        jsonPost R $URL_BASE/api?method=job.submit&name=CSV2PDF&token=$token [subst -nocommands {
-            "options" : [
-                    {"name" : "localFile", "value" : "$csv"},
-                    {"name" : "reportPath", "value" : "$rpt"},
-                    {"name" : "hasHeader", "value" : true},
-                    {"name" : "hasDataType", "value" : true},
-                    {"name" : "sep", "value" : ","},
-                    {"name" : "keyExpr", "value" : "if({0}==''){{2}}else{{0}}"},
-                    {"name" : "encoding", "value" : "utf-8"}
-                ],
-            "parameters" : []
-        }]
+        if {![info exists csvs]} {
+            lappend csvs u1d1.csv
+        }
+        foreach csv $csvs {
+            jsonPost R $URL_BASE/api?method=job.submit&name=CSV2DOC&token=$token [subst -nocommands {
+                "options" : [
+                        {"name" : "localFile", "value" : "$csv"},
+                        {"name" : "reportPath", "value" : "$rpt"},
+                        {"name" : "hasHeader", "value" : true},
+                        {"name" : "hasDataType", "value" : true},
+                        {"name" : "sep", "value" : ","},
+                        {"name" : "keyExpr", "value" : "if({0}==''){{2}}else{{0}}"},
+                        {"name" : "encoding", "value" : "utf-8"}
+                    ],
+                "parameters" : []
+            }]
+            set fd [open "|underscore print --color" w]
+            puts $fd $R
+            close $fd
+        }
+        exit
     }
     doc.query {
         jsonPost R $URL_BASE/api?method=doc.query&token=$token [subst {

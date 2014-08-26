@@ -17,6 +17,7 @@ alias ll='ls -l'
 alias h='history'
 alias js='cd $HOME/.JS/bin'
 alias tea='cd $HOME/.JS/tea'
+alias py='cd $HOME/.JS/py'
 alias vi='vim'
 alias jp='underscore print --color'
 

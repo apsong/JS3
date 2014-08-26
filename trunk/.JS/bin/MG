@@ -85,19 +85,21 @@ mg_findColumn()
 
 mg_monitor()
 {
-    LAST=0; NOW=`now_seconds`
+    LAST=0; NEXT=`now_seconds`
 
     NUM_0=0
     TOTAL=0
     while [ 1 ]; do
-        COUNT=`mg_countBetween $LAST $NOW`
+        COUNT=`mg_countBetween $LAST $NEXT`
         [ $LAST -ne 0 ] && TOTAL=`expr $TOTAL + $COUNT`
-        printf "[`time_str $NOW`] + %4d  = $TOTAL\n" $COUNT
+        printf "[`time_str $NEXT`] + %4d  = $TOTAL\n" $COUNT
         [ "$COUNT" -eq "0" ] && NUM_0=`expr $NUM_0 + 1`
         [ "$NUM_0" -ge "60" ] && break
-        sleep $INTERVAL
 
-        LAST=$NOW; NOW=`expr $NOW + $INTERVAL`
+        LAST=$NEXT; NEXT=`expr $NEXT + $INTERVAL`
+        while [ $NEXT -gt `now_seconds` ]; do
+            sleep 1
+        done
     done
     #done | tee `NEWFILE $PROGRAM.log`
 }

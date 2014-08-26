@@ -5,10 +5,11 @@ set sw=4
 set et
 set hls
 syntax on
-set nobackup
 set showmatch
 set matchtime=1
 set backspace=2
+set backupdir=/tmp/vim-tmp,.
+set directory=/tmp/vim-tmp,.
 
 if !has("gui_running")
     set t_Co=8

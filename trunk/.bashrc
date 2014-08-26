@@ -6,7 +6,7 @@ source $HOME/.bash_ds_functions
 export PS1="[\u]\w> "
 export JAVA_HOME=/opt/jdk1.7.0_60
 export JS_HOME=$HOME/.JS
-export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.2.1/bin:$JS_HOME/bin:$JS_HOME/tea:$PATH
+export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.2.1/bin:$JS_HOME/bin:$JS_HOME/tea:$JS_HOME/py:$PATH
 export PATH=/opt/node-v0.10.29-linux-x64/bin:$PATH
 
 [ "$HOSTNAME" != "jinsong" ] && export LANG=C
@@ -17,7 +17,8 @@ alias ll='ls -l'
 alias h='history'
 alias js='cd $HOME/.JS/bin'
 alias tea='cd $HOME/.JS/tea'
-alias py='cd $HOME/.JS/py'
+alias p='cd $HOME/.JS/py'
+alias py='python3.4'
 alias vi='vim'
 alias jp='underscore print --color'
 

@@ -3,7 +3,7 @@ source $HOME/.bash_functions
 [ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_ds_functions #######"
 source $HOME/.bash_ds_functions
 
-export PS1="[\u]\w> "
+export PS1="[\u@\h]\w> "
 export JAVA_HOME=/opt/jdk1.7.0_60
 export JS_HOME=$HOME/.JS
 export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.2.1/bin:$JS_HOME/bin:$JS_HOME/tea:$JS_HOME/py:$PATH

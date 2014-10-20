@@ -60,7 +60,7 @@ set HOST 192.168.99.241
 set PORT 9091
 set URL_BASE https://$HOST:$PORT
 
-jsonPost R $URL_BASE/api?method=user.authorize {"userid":"test","password":"test"}
+jsonPost R $URL_BASE/api?method=user.authorize {"userid":"system","password":"manage"}
 if {[catch {dict get [::json::json2dict $R] response token} token]} {
     log::log error "($PROGRAM) $R"
     exit 1

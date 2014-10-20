@@ -1,0 +1,84 @@
+ds.cfg()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/DocumentService/config
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+
+ds.tmp()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/DocumentService/temp
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+
+ds.log()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/DocumentService/logs
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+
+js.cfg()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/JobScheduler/config
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+
+js.tmp()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/JobScheduler/temp
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+
+js.log()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/JobScheduler/logs
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+

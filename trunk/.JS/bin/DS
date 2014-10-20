@@ -193,9 +193,11 @@ case $PROGRAM in
         echo
 
         rm -f $DIR/../repository
-        ln -sfv $MODULES/DocumentService/repository $DIR/../repository
+        ln -sv $MODULES/DocumentService/repository $DIR/../repository
         rm -rf $MODULES/DocumentService/reportEngine/resource
         ln -sv /TEST/resource $MODULES/DocumentService/reportEngine
+        rm -f $DIR/fonts
+        ln -sv /TEST/fonts $DIR
         echo
 
         #rm -v $MODULES/DocumentService/reportEngine/plugins/PavoDataEngine*.jar

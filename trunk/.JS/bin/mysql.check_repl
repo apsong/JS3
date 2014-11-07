@@ -18,6 +18,5 @@ for ID in $IDs; do
     echo
     echo "#!CMD:[ source $ID.env ]"
     echo
-    source $ID.env
-    echo $SQL | bin/mysql -u root -t -vvv -f
+    source $ID.env && echo $SQL | bin/mysql -u root -t -vvv -f
 done

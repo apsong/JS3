@@ -75,8 +75,8 @@ CHANGE MASTER TO MASTER_HOST='localhost', MASTER_PORT=`expr 3403 - $ID`, MASTER_
 START SLAVE;
 "
 
-source $ID.env
 cd $PWD
+source $ID.env
 if [ \`grep -c '###' $ID.cnf\` -gt 0 ]; then
     bin/mysqld_safe --defaults-file=$ID.cnf &
     sleep 1
@@ -92,6 +92,16 @@ fi
 EOF
 EVAL cat $ID.start
 chmod 755 $ID.start
+
+cat > $ID.stop << EOF
+#!/bin/sh
+
+cd $PWD
+source $ID.env
+bin/mysqladmin -u root shutdown
+EOF
+EVAL cat $ID.stop
+chmod 755 $ID.stop
 
 EVAL ls -lh $ID.{cnf,env,start} $ID.data
 

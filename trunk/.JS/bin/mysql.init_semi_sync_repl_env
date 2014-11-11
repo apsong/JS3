@@ -1,0 +1,107 @@
+#! /bin/sh
+
+# Usage:
+#   [@mysql-1]> cd /opt/mysql; mysql.init_env 1; 1.start
+#   [@mysql-2]> cd /opt/mysql; mysql.init_env 2; 2.start
+#   [@mysql-1]> 1.start
+#   [@mysql-2]> 2.start
+#   [@mysql-1]> . 1.env; mysql.check_repl
+#   [@mysql-2]> . 2.env; mysql.check_repl
+
+PROGRAM=`basename $0`
+
+EVAL()
+{
+    case "$1" in
+        cat|ls)
+            #echo "#!CMD:[" $@ "]"
+            #eval "$@"
+            #echo
+            ;;
+        *)
+            echo "#!CMD:[" $@ "]"
+            eval "$@"
+            ;;
+    esac
+}
+
+usage()
+{
+    echo 1>&2 "Usage: $PROGRAM {1|2}"
+}
+
+ID=$1
+[ "$ID" != "1" -a "$ID" != "2" ] && { usage; exit 1;}
+
+[ ! -f scripts/mysql_install_db ] && { echo 1>&2 "Error: Cannot find scripts/mysql_install_db."; exit 2;}
+
+EVAL mkdir $ID.data || exit 3
+scripts/mysql_install_db --datadir=$ID.data
+
+cat > $ID.cnf <<EOF
+[mysqld]
+log-bin=mysql-bin
+#replicate-wild-do-table=db1.*
+#replicate-wild-do-table=db2.*
+#replicate-wild-ignore-table=mysql.*
+server-id=$ID
+port=`expr 3400 + $ID`
+socket=/tmp/mysql.sock$ID
+datadir=/opt/mysql/$ID.data
+expire_logs_days=3
+###rpl_semi_sync_master_enabled=1
+###rpl_semi_sync_master_timeout=10000 # 10 second
+###rpl_semi_sync_slave_enabled=1
+EOF
+EVAL cat $ID.cnf
+
+cat > $ID.env << EOF
+export MYSQL_UNIX_PORT=/tmp/mysql.sock$ID
+export MYSQL_TCP_PORT=`expr 3400 + $ID`
+export MYSQL_PS1="MYSQL-$ID> "
+EOF
+EVAL cat $ID.env
+
+cat > $ID.start << EOF
+#!/bin/sh
+
+SQL="
+INSTALL PLUGIN rpl_semi_sync_master SONAME 'semisync_master.so';
+INSTALL PLUGIN rpl_semi_sync_slave  SONAME 'semisync_slave.so';
+CREATE USER 'repl'@'localhost' IDENTIFIED BY 'slavepass';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'localhost';
+RESET MASTER;
+CHANGE MASTER TO MASTER_HOST='localhost', MASTER_PORT=`expr 3403 - $ID`, MASTER_USER='repl', MASTER_PASSWORD='slavepass', MASTER_LOG_FILE='mysql-bin.000001', MASTER_LOG_POS=0;
+START SLAVE;
+"
+
+cd $PWD
+source $ID.env
+if [ \`grep -c '###' $ID.cnf\` -gt 0 ]; then
+    bin/mysqld_safe --defaults-file=$ID.cnf &
+    sleep 1
+    echo "\$SQL" | bin/mysql -u root -t -vvv -f 2>&1 | tee $ID.start.log
+    bin/mysqladmin -u root shutdown
+    if [ \`grep -c 'ERROR' $ID.start.log\` -eq 0 ]; then
+        echo; rm -f $ID.start.log; sed -i -e 's/###//g' $ID.cnf; grep '###' $ID.cnf
+    fi
+else
+    bin/mysqld_safe --defaults-file=$ID.cnf &
+    sleep 1; echo
+fi
+EOF
+EVAL cat $ID.start
+chmod 755 $ID.start
+
+cat > $ID.stop << EOF
+#!/bin/sh
+
+cd $PWD
+source $ID.env
+bin/mysqladmin -u root shutdown
+EOF
+EVAL cat $ID.stop
+chmod 755 $ID.stop
+
+EVAL ls -lh $ID.{cnf,env,start} $ID.data
+

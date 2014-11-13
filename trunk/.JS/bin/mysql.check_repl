@@ -5,8 +5,8 @@ cd /opt/mysql
 SQL="
 SHOW MASTER STATUS;
 SHOW SLAVE HOSTS;
-SHOW VARIABLES LIKE 'rpl_semi_%';
-SHOW STATUS LIKE 'rpl_semi_%';
+#SHOW VARIABLES LIKE 'rpl_semi_%';
+#SHOW STATUS LIKE 'rpl_semi_%';
 "
 
 case "$1" in
@@ -16,7 +16,7 @@ case "$1" in
 esac
 for ID in $IDs; do
     echo
-    echo "#!CMD:[ source $ID.env ]"
+    echo "#!CMD:[ source $ID/env ]"
     echo
-    source $ID.env && echo $SQL | bin/mysql -u root -t -vvv -f
+    source $ID/env && echo $SQL | bin/mysql -u root -t -vvv -f
 done

@@ -45,6 +45,14 @@ server-id=$ID
 port=`expr 3400 + $ID`
 socket=/tmp/mysql.sock$ID
 datadir=/opt/mysql/$ID/data
+
+gtid-mode=ON
+log-bin=mysql-bin
+log-slave-updates=ON
+enforce-gtid-consistency=ON
+#replicate-wild-do-table=db1.*
+#replicate-wild-do-table=db2.*
+#replicate-wild-ignore-table=mysql.*
 EOF
 EVAL cat $ID/cnf
 
@@ -58,10 +66,24 @@ EVAL cat $ID/env
 cat > $ID/start << EOF
 #!/bin/sh
 
+SQL="
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'localhost' identified by 'pass';
+STOP SLAVE;
+CHANGE MASTER TO MASTER_HOST='localhost', MASTER_PORT=`expr 3403 - $ID`,
+                 MASTER_USER='repl', MASTER_PASSWORD='pass',
+                 MASTER_AUTO_POSITION = 1;
+START SLAVE;
+"
+
 cd $PWD
 source $ID/env
 bin/mysqld_safe --defaults-file=$ID/cnf &
-sleep 1; echo
+echo
+if [ ! -f $ID/init.log ] || [ \`grep -c 'ERROR' $ID/init.log\` -gt 0 ]; then
+    sleep 1
+    echo "\$SQL" | bin/mysql -u root -t -vvv -f 2>&1 | tee $ID/init.log
+fi
+grep 'ERROR' $ID/init.log
 EOF
 EVAL cat $ID/start
 chmod 755 $ID/start

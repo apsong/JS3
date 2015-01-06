@@ -27,7 +27,7 @@ EVAL()
 
 usage()
 {
-    echo 1>&2 "Usage: $PROGRAM {0|1|2|3|...}"
+    echo 1>&2 "Usage: $PROGRAM {1|2}"
 }
 
 ID=$1
@@ -78,9 +78,9 @@ START SLAVE;
 cd $PWD
 source $ID/env
 bin/mysqld_safe --defaults-file=$ID/cnf &
+sleep 1
 echo
 if [ ! -f $ID/init.log ] || [ \`grep -c 'ERROR' $ID/init.log\` -gt 0 ]; then
-    sleep 1
     echo "\$SQL" | bin/mysql -u root -t -vvv -f 2>&1 | tee $ID/init.log
 fi
 grep 'ERROR' $ID/init.log

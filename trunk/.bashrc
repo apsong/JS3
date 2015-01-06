@@ -41,3 +41,4 @@ unset IFS
 export PATH="$_PATH"
 
 unset TZ
+ulimit -c unlimited

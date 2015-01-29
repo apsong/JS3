@@ -27,10 +27,10 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-#DB=192.168.99.141:37017/test
-[ "$DB" = "" ] && DB=192.168.99.98:40000/perf
-[ "$U"  = "" ] && U=test
-[ "$P"  = "" ] && P=test
+
+[ "$DB" = "" ] && DB=192.168.99.85:40000/kydsystem
+[ "$U"  = "" ] && U=kyd
+[ "$P"  = "" ] && P=kyd
 [ "$INTERVAL" = "" ] && INTERVAL=60
 
 now_seconds()

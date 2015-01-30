@@ -182,8 +182,8 @@ case $PROGRAM in
 
         if [ ! -f $DS_CFG.bak ]; then
             cp -v $DS_CFG $DS_CFG.bak
-            sed -e 's/listeningServer.pool.maxWorkerThreads=.*/listeningServer.pool.maxWorkerThreads=8\ndebugMode=false/' \
-                -e 's/listeningServer.pool.minWorkerThreads=.*/listeningServer.pool.minWorkerThreads=8/' $DS_CFG.bak > $DS_CFG
+            sed -e 's/listeningServer.pool.maxWorkerThreads=.*/listeningServer.pool.maxWorkerThreads=4\ndebugMode=false/' \
+                -e 's/listeningServer.pool.minWorkerThreads=.*/listeningServer.pool.minWorkerThreads=4/' $DS_CFG.bak > $DS_CFG
         fi
         EVAL diff $DS_CFG.bak $DS_CFG
         echo

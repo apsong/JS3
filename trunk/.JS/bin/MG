@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-[ "$DB" = "" ] && DB=192.168.99.85:40000/kydsystem
+[ "$DB" = "" ] && DB="192.168.99.85:40000/kyddata --authenticationDatabase kydsystem"
 [ "$U"  = "" ] && U=kyd
 [ "$P"  = "" ] && P=kyd
 [ "$INTERVAL" = "" ] && INTERVAL=60

@@ -175,7 +175,7 @@ case $PROGRAM in
     all.postInstall)
         if [ ! -f $JS_JOB.bak ]; then
             cp -v $JS_JOB $JS_JOB.bak
-            sed -e 's@<maxExecutionTime>.*</maxExecutionTime>@<maxExecutionTime>720</maxExecutionTime>@' $JS_JOB.bak > $JS_JOB
+            sed -e 's@<maxExecutionTime>.*</maxExecutionTime>@<maxExecutionTime>4320</maxExecutionTime>@' $JS_JOB.bak > $JS_JOB
         fi
         EVAL diff $JS_JOB.bak $JS_JOB
         echo

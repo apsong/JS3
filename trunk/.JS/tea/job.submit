@@ -105,6 +105,14 @@ switch -exact -- $PROGRAM {
         }]
     }
     doc.queryRandom {
+        if {[info exists ::env(INTERVAL)]} {
+            set interval $::env(INTERVAL)
+            puts "\[[nowtimeAdd]\] interval=$interval (from \$env(INTERVAL))"
+        } else {
+            set interval 10
+            puts "\[[nowtimeAdd]\] interval=$interval (by default)"
+        }
+
         puts "\[[nowtimeAdd]\] ($PROGRAM) Preparing keys for query..."
         #set fd [open "|mg.findColumn | shuf -n 1000000 --random-source=/opt/random10M"]
         set fd [open "|mg.findColumn | shuf -n 1000000"]
@@ -115,7 +123,6 @@ switch -exact -- $PROGRAM {
         puts "\[[nowtimeAdd]\] ($PROGRAM) Query start~"
         set len [llength $ids]
 
-        set interval 10
         set next [clock seconds]
         for {set i 0; set count 0} {true} {incr i; incr count} {
             set id [lindex $ids [expr {$i%$len}]]
@@ -136,7 +143,7 @@ switch -exact -- $PROGRAM {
                     }
                     puts "\[[nowtime $now]\] $count => ID: $id  FILE: $filenames"
                     set count 0
-                    set next [expr {[clock seconds] + 10}]
+                    set next [expr {[clock seconds] + $interval}]
                     continue
                 }
             }

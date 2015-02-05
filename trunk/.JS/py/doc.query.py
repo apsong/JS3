@@ -1,50 +1,51 @@
 #! /usr/bin/env python3.4
 
 import threading, logging
-import json, random
+import json, random, time
 import http.client
 from pymongo import MongoClient
 import argparse
 
 parser = argparse.ArgumentParser(description='Start threads to doc.query repeately.')
 parser.add_argument('-t', dest='THREADS', type=int, default=1)
-parser.add_argument('-n', dest='NUM2RUN', type=int, default=1)
+parser.add_argument('-s', dest='SECONDS', type=int, default=60)
+parser.add_argument('-i', dest='INTERVAL', type=int, default=10)
 ARGS = parser.parse_args()
 
 logging.basicConfig(format=' [%(asctime)s] %(message)s', datefmt='%H:%M:%S', 
         level=logging.INFO)
 
 class TestClient(threading.Thread):
-    host = None
-    port = None
-    conn = None
-    token = None
-    count = 0
+    TOTAL_COUNT = 0
+    IS_EXIT = False
 
     def __init__(self, host, port=None):
         threading.Thread.__init__(self, name=threading.active_count())
         self.host = host
         self.port = port
         self.conn = http.client.HTTPSConnection(self.host, self.port)
+        self.count = 0
         #self.conn.set_debuglevel(1)
 
     def close(self):
         self.conn.close()
 
     def user_authorize(self, userid, password):
+        logging.info("\b@%s  TOKEN?" % (self.name))
         self.conn.request("POST", "/api?method=user.authorize", \
             '{"userid":"%s","password":"%s"}' % (userid, password),\
             {"Content-type":"application/json"})
         resp = self.conn.getresponse()
         data = resp.read()
         if (resp.code != 200):
-            logging.error("\b@%s  %d: %d %s" % (self.name, self.count,
+            logging.error("\b@%s  %d/%d: %d %s" % (self.name, self.count, TestClient.TOTAL_COUNT,
                         resp.code, resp.reason))
-            return
+            return False
 
         dict = json.loads(data.decode())
         self.token = dict['response']['token']
-        print(self.name, ":", self.token)
+        logging.info("\b@%s  TOKEN: %s" % (self.name, self.token))
+        return True
 
     def doc_query(self, merchantid, is_print):
         self.conn.request("POST", "/api?method=doc.query&token="+self.token,\
@@ -53,27 +54,29 @@ class TestClient(threading.Thread):
         resp = self.conn.getresponse()
         data = resp.read()
         if (resp.code != 200):
-            logging.error("\b@%s  %d: %d %s" % (self.name, self.count,
+            logging.error("\b@%s  %d/%d: %d %s" % (self.name, self.count, TestClient.TOTAL_COUNT,
                         resp.code, resp.reason))
-            return
+            return False
 
         if (is_print):
             dict = json.loads(data.decode())
             #print(json.dumps(dict, indent=2))
-            logging.info("\b@%s  %d: %s => %s" % (self.name, self.count, merchantid, 
-                         " ".join([e['filename'] for e in dict['response']])))
+            logging.info("\b@%s  %d: %s => %s" % (self.name, TestClient.TOTAL_COUNT,
+                        merchantid, " ".join([e['filename'] for e in dict['response']])))
+        return True
 
     def run(self):
-        global ARGS
-        count = 0
-        while (count != ARGS.NUM2RUN):
-            self.user_authorize('system', 'manage')
-            count += 1
-#        while True:
-#            global ids
-#            for id in ids:
-#                self.doc_query(id, self.count % 1000 == 0)
-#                self.count+=1
+        global ARGS, ids
+        if not self.user_authorize('system', 'manage'):
+            return
+        while True:
+            for id in ids:
+                if (TestClient.IS_EXIT):
+                    logging.info("\b@%s  Exit." % (self.name))
+                    return
+                if self.doc_query(id, TestClient.TOTAL_COUNT % 1000 == 0):
+                    self.count += 1
+                    TestClient.TOTAL_COUNT += 1
 
 def get_merchantids(host, port, database, username, password):
     logging.info("Connect to mongo://{3}:{4}@{0}:{1}/{2} for merchantid.".format(
@@ -81,9 +84,10 @@ def get_merchantids(host, port, database, username, password):
     mg = MongoClient(host, port)
     db = mg[database]
     db.authenticate(username, password)
+    db = mg["kyddata"]
     files = db.fs.files
     ids = {row["metadata"]["parameter"]["merchantid"]
-           for row in files.find(fields={"metadata.parameter.merchantid":1,"_id":0}, limit=10)}
+           for row in files.find(fields={"metadata.parameter.merchantid":1,"_id":0}, limit=10001)}
     logging.info("Get %d merchantid." % len(ids))
     ids = list(ids);     logging.info("Listed.")
     random.shuffle(ids); logging.info("Shuffled.")
@@ -92,11 +96,33 @@ def get_merchantids(host, port, database, username, password):
     return ids
 
 ################################## MAIN ###################################
-ids = get_merchantids('192.168.99.241', 40000, 'kydsystem', 'kyd', 'kyd')
+ids = get_merchantids('192.168.99.85', 40000, 'kydsystem', 'kyd', 'kyd')
+
+tc = list(range(ARGS.THREADS))
+for i in range(ARGS.THREADS):
+    tc[i] = TestClient("192.168.99.85", 9091)
+    tc[i].start()
+
+last_counts = [0] * ARGS.THREADS
+last_total  = 0
+next = time.time()
+end  = time.time() + ARGS.SECONDS
+while (time.time() < end):
+    time.sleep(1)
+    if (time.time() >= next):
+        next += ARGS.INTERVAL
+        counts = [tc[i].count for i in range(ARGS.THREADS)]
+        logging.info("+%d = %d (%s)" % (TestClient.TOTAL_COUNT-last_total,
+                    TestClient.TOTAL_COUNT,
+                    "".join(map(lambda i: " +%d" % i, [a-b for a,b in zip(counts, last_counts)]))))
+
+        last_counts = counts
+        last_total = TestClient.TOTAL_COUNT
+else:
+    TestClient.IS_EXIT = True
 
 for i in range(ARGS.THREADS):
-    tc = TestClient("192.168.99.241", 9091)
-    tc.start()
-tc.join()
-tc.close()
+    tc[i].join()
+for i in range(ARGS.THREADS):
+    tc[i].close()
 

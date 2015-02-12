@@ -1,19 +1,21 @@
 #! /usr/bin/env python3.4
 
 import threading, logging
-import json, random, time
+import json, random, time, math
 import http.client
 from pymongo import MongoClient
 import argparse
 
 parser = argparse.ArgumentParser(description='Start threads to doc.query repeately.')
-parser.add_argument('-t', dest='THREADS', type=int, default=1)
-parser.add_argument('-s', dest='SECONDS', type=int, default=60)
-parser.add_argument('-i', dest='INTERVAL', type=int, default=10)
+parser.add_argument('-n', dest='THREADS', type=int, default=1)
+parser.add_argument('-t', dest='TICKS', type=int, default=6)
+parser.add_argument('--tick_seconds', dest='TICK_SECONDS', type=int, default=100)
+parser.add_argument('-r', dest='REPORT', type=int, default=0)
 ARGS = parser.parse_args()
 
 logging.basicConfig(format=' [%(asctime)s] %(message)s', datefmt='%H:%M:%S', 
         level=logging.INFO)
+logging.info(ARGS)
 
 class TestClient(threading.Thread):
     TOTAL_COUNT = 0
@@ -72,9 +74,10 @@ class TestClient(threading.Thread):
         while True:
             for id in ids:
                 if (TestClient.IS_EXIT):
-                    logging.info("\b@%s  Exit." % (self.name))
+                    logging.info("\b@%s  Exit" % (self.name))
                     return
-                if self.doc_query(id, TestClient.TOTAL_COUNT % 1000 == 0):
+                if self.doc_query(id, 
+                        ARGS.REPORT>0 and TestClient.TOTAL_COUNT%ARGS.REPORT==0):
                     self.count += 1
                     TestClient.TOTAL_COUNT += 1
 
@@ -101,17 +104,20 @@ ids = get_merchantids('192.168.99.85', 40000, 'kydsystem', 'kyd', 'kyd')
 tc = list(range(ARGS.THREADS))
 for i in range(ARGS.THREADS):
     tc[i] = TestClient("192.168.99.85", 9091)
+    time.sleep(1)
     tc[i].start()
 
 last_counts = [0] * ARGS.THREADS
 last_total  = 0
+report_list = list()
 next = time.time()
-end  = time.time() + ARGS.SECONDS
+end  = time.time() + ARGS.TICK_SECONDS * ARGS.TICKS
 while (time.time() < end):
     time.sleep(1)
     if (time.time() >= next):
-        next += ARGS.INTERVAL
+        next += ARGS.TICK_SECONDS
         counts = [tc[i].count for i in range(ARGS.THREADS)]
+        report_list.append(TestClient.TOTAL_COUNT-last_total)
         logging.info("+%d = %d (%s)" % (TestClient.TOTAL_COUNT-last_total,
                     TestClient.TOTAL_COUNT,
                     "".join(map(lambda i: " +%d" % i, [a-b for a,b in zip(counts, last_counts)]))))
@@ -126,3 +132,8 @@ for i in range(ARGS.THREADS):
 for i in range(ARGS.THREADS):
     tc[i].close()
 
+report_list = report_list[(len(report_list)-1)//3+1:]
+
+logging.info("%d thread(s): %.1f doc.query/second  <= (%s)/%d/%d" % 
+        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.TICK_SECONDS,
+         "+".join(map(str, report_list)), len(report_list), ARGS.TICK_SECONDS))

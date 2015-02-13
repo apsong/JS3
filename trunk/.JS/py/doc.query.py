@@ -1,7 +1,7 @@
 #! /usr/bin/env python3.4
 
 import threading, logging
-import json, random, time, math
+import json, random, time, math, base64
 import http.client
 from pymongo import MongoClient
 import argparse
@@ -9,6 +9,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Start threads to doc.query repeately.')
 parser.add_argument('-n', dest='THREADS', type=int, default=1)
 parser.add_argument('-t', dest='TICKS', type=int, default=6)
+parser.add_argument('--download', dest='DOWNLOAD', action='store_true')
 parser.add_argument('--tick_seconds', dest='TICK_SECONDS', type=int, default=100)
 parser.add_argument('-r', dest='REPORT', type=int, default=0)
 ARGS = parser.parse_args()
@@ -60,11 +61,38 @@ class TestClient(threading.Thread):
                         resp.code, resp.reason))
             return False
 
-        if (is_print):
+        if ARGS.DOWNLOAD:
             dict = json.loads(data.decode())
             #print(json.dumps(dict, indent=2))
-            logging.info("\b@%s  %d: %s => %s" % (self.name, TestClient.TOTAL_COUNT,
-                        merchantid, " ".join([e['filename'] for e in dict['response']])))
+            #for e in dict['response']:
+            id = dict['response'][0]["_id"]
+            pdf = dict['response'][0]["filename"]
+            if self.doc_download(id, pdf, is_print) and is_print:
+                logging.info("\b@%s  %d: %s => %s => %s" % (self.name,
+                            TestClient.TOTAL_COUNT, merchantid, id, pdf))
+        elif is_print:
+            dict = json.loads(data.decode())
+            #print(json.dumps(dict, indent=2))
+            logging.info("\b@%s  %d: %s => %s" % (self.name,
+                        TestClient.TOTAL_COUNT, merchantid,
+                        " ".join([e['filename'] for e in dict['response']])))
+        return True
+
+    def doc_download(self, id, pdf, is_save):
+        self.conn.request("GET", "/api?method=doc.download&id=%s&token=%s" %
+                (id, self.token))
+        resp = self.conn.getresponse()
+        data = resp.read()
+        if (resp.code != 200):
+            logging.error("\b@%s  %d/%d: %d %s" % (self.name, self.count,
+                        TestClient.TOTAL_COUNT, resp.code, resp.reason))
+            return False
+
+        if is_save:
+            dict = json.loads(data.decode())
+            #print(json.dumps(dict, indent=2))
+            with open(pdf, 'wb') as f:
+                f.write(base64.b64decode(dict['response']))
         return True
 
     def run(self):
@@ -92,8 +120,8 @@ def get_merchantids(host, port, database, username, password):
     ids = {row["metadata"]["parameter"]["merchantid"]
            for row in files.find(fields={"metadata.parameter.merchantid":1,"_id":0}, limit=10001)}
     logging.info("Get %d merchantid." % len(ids))
-    ids = list(ids);     logging.info("Listed.")
-    random.shuffle(ids); logging.info("Shuffled.")
+    ids = list(ids);     #logging.info("Listed.")
+    random.shuffle(ids); #logging.info("Shuffled.")
 
     mg.close()
     return ids
@@ -132,8 +160,13 @@ for i in range(ARGS.THREADS):
 for i in range(ARGS.THREADS):
     tc[i].close()
 
+######################### Final Report ######################################
 report_list = report_list[(len(report_list)-1)//3+1:]
 
-logging.info("%d thread(s): %.1f doc.query/second  <= (%s)/%d/%d" % 
-        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.TICK_SECONDS,
+if ARGS.DOWNLOAD:
+    d = "&download"
+else:
+    d= ""
+logging.info("%d thread(s): %.1f doc.query%s/second  <= (%s)/%d/%d" % 
+        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.TICK_SECONDS, d,
          "+".join(map(str, report_list)), len(report_list), ARGS.TICK_SECONDS))

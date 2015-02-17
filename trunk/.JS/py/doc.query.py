@@ -6,16 +6,23 @@ import http.client
 from pymongo import MongoClient
 import argparse
 
-parser = argparse.ArgumentParser(description='Start threads to doc.query repeately.')
-parser.add_argument('-n', dest='THREADS', type=int, default=1)
-parser.add_argument('-t', dest='TICKS', type=int, default=6)
+parser = argparse.ArgumentParser(description='Start threads to doc.query repeately.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('-t', dest='THREADS', type=int, default=1)
+parser.add_argument('-b', dest='BATCHES', type=int, default=6)
 parser.add_argument('--download', dest='DOWNLOAD', action='store_true')
-parser.add_argument('--tick_seconds', dest='TICK_SECONDS', type=int, default=100)
+parser.add_argument('--batch_size', dest='BATCH_SIZE', type=int, default=100)
+parser.add_argument('--debug', dest='DEBUG', action='store_true')
 parser.add_argument('-r', dest='REPORT', type=int, default=0)
 ARGS = parser.parse_args()
+#TODO support batch for both seconds and iterations
 
-logging.basicConfig(format=' [%(asctime)s] %(message)s', datefmt='%H:%M:%S', 
-        level=logging.INFO)
+threading.Thread.name = "M"
+if ARGS.DEBUG:
+    lvl=logging.DEBUG
+else:
+    lvl=logging.INFO
+logging.basicConfig(format=' [%(asctime)s.%(msecs)03d@%(threadName)s] %(message)s', datefmt='%H:%M:%S', level=lvl)
 logging.info(ARGS)
 
 class TestClient(threading.Thread):
@@ -34,31 +41,31 @@ class TestClient(threading.Thread):
         self.conn.close()
 
     def user_authorize(self, userid, password):
-        logging.info("\b@%s  TOKEN?" % (self.name))
+        logging.info("TOKEN?")
         self.conn.request("POST", "/api?method=user.authorize", \
             '{"userid":"%s","password":"%s"}' % (userid, password),\
             {"Content-type":"application/json"})
         resp = self.conn.getresponse()
         data = resp.read()
         if (resp.code != 200):
-            logging.error("\b@%s  %d/%d: %d %s" % (self.name, self.count, TestClient.TOTAL_COUNT,
-                        resp.code, resp.reason))
+            logging.error("%d/%d: %d %s" % (self.count, TestClient.TOTAL_COUNT, resp.code, resp.reason))
             return False
 
         dict = json.loads(data.decode())
         self.token = dict['response']['token']
-        logging.info("\b@%s  TOKEN: %s" % (self.name, self.token))
+        logging.info("TOKEN: %s" % (self.token))
         return True
 
     def doc_query(self, merchantid, is_print):
+        logging.debug("doc.query?")
         self.conn.request("POST", "/api?method=doc.query&token="+self.token,\
             '{"query":{"metadata.parameter.merchantid":"%s"}}' % merchantid,\
             {"Content-type":"application/json"})
         resp = self.conn.getresponse()
+        logging.debug("doc.query.response!")
         data = resp.read()
         if (resp.code != 200):
-            logging.error("\b@%s  %d/%d: %d %s" % (self.name, self.count, TestClient.TOTAL_COUNT,
-                        resp.code, resp.reason))
+            logging.error("%d/%d: %d %s" % (self.count, TestClient.TOTAL_COUNT, resp.code, resp.reason))
             return False
 
         if ARGS.DOWNLOAD:
@@ -68,24 +75,22 @@ class TestClient(threading.Thread):
             id = dict['response'][0]["_id"]
             pdf = dict['response'][0]["filename"]
             if self.doc_download(id, pdf, is_print) and is_print:
-                logging.info("\b@%s  %d: %s => %s => %s" % (self.name,
-                            TestClient.TOTAL_COUNT, merchantid, id, pdf))
+                logging.info("%d: %s => %s => %s" % (TestClient.TOTAL_COUNT, merchantid, id, pdf))
         elif is_print:
             dict = json.loads(data.decode())
             #print(json.dumps(dict, indent=2))
-            logging.info("\b@%s  %d: %s => %s" % (self.name,
-                        TestClient.TOTAL_COUNT, merchantid,
-                        " ".join([e['filename'] for e in dict['response']])))
+            logging.info("%d: %s => %s" % (TestClient.TOTAL_COUNT, merchantid, " ".join([e['filename'] for e in dict['response']])))
         return True
 
     def doc_download(self, id, pdf, is_save):
+        logging.debug("doc.download?")
         self.conn.request("GET", "/api?method=doc.download&id=%s&token=%s" %
                 (id, self.token))
         resp = self.conn.getresponse()
+        logging.debug("doc.download.response!")
         data = resp.read()
         if (resp.code != 200):
-            logging.error("\b@%s  %d/%d: %d %s" % (self.name, self.count,
-                        TestClient.TOTAL_COUNT, resp.code, resp.reason))
+            logging.error("%d/%d: %d %s" % (self.count, TestClient.TOTAL_COUNT, resp.code, resp.reason))
             return False
 
         if is_save:
@@ -102,7 +107,7 @@ class TestClient(threading.Thread):
         while True:
             for id in ids:
                 if (TestClient.IS_EXIT):
-                    logging.info("\b@%s  Exit" % (self.name))
+                    logging.info("Exit")
                     return
                 if self.doc_query(id, 
                         ARGS.REPORT>0 and TestClient.TOTAL_COUNT%ARGS.REPORT==0):
@@ -139,11 +144,11 @@ last_counts = [0] * ARGS.THREADS
 last_total  = 0
 report_list = list()
 next = time.time()
-end  = time.time() + ARGS.TICK_SECONDS * ARGS.TICKS
+end  = time.time() + ARGS.BATCH_SIZE * ARGS.BATCHES
 while (time.time() < end):
     time.sleep(1)
     if (time.time() >= next):
-        next += ARGS.TICK_SECONDS
+        next += ARGS.BATCH_SIZE
         counts = [tc[i].count for i in range(ARGS.THREADS)]
         report_list.append(TestClient.TOTAL_COUNT-last_total)
         logging.info("+%d = %d (%s)" % (TestClient.TOTAL_COUNT-last_total,
@@ -168,5 +173,5 @@ if ARGS.DOWNLOAD:
 else:
     d= ""
 logging.info("%d thread(s): %.1f doc.query%s/second  <= (%s)/%d/%d" % 
-        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.TICK_SECONDS, d,
-         "+".join(map(str, report_list)), len(report_list), ARGS.TICK_SECONDS))
+        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.BATCH_SIZE, d,
+         "+".join(map(str, report_list)), len(report_list), ARGS.BATCH_SIZE))

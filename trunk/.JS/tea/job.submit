@@ -69,6 +69,7 @@ if {[catch {dict get [::json::json2dict $R] response token} token]} {
 switch -exact -- $PROGRAM {
     job.submit {
         set rpt /public/daily.rptdesign
+        #set rpt daily.rptdesign
 
         foreach arg $argv {
             switch -glob -- $arg {
@@ -88,11 +89,12 @@ switch -exact -- $PROGRAM {
                         {"name" : "hasHeader", "value" : true},
                         {"name" : "hasDataType", "value" : true},
                         {"name" : "sep", "value" : ","},
-                        {"name" : "keyExpr", "value" : "if({0}==''){{2}}else{{0}}"},
+                        {"name" : "keyExpr", "value" : "{0}"},
                         {"name" : "encoding", "value" : "utf-8"}
                     ],
                 "parameters" : []
             }]
+                        #{"name" : "keyExpr", "value" : "if({0}==''){{2}}else{{0}}"},
             set fd [open "|underscore print --color" w]
             puts $fd $R
             close $fd
@@ -105,6 +107,14 @@ switch -exact -- $PROGRAM {
         }]
     }
     doc.queryRandom {
+        if {[info exists ::env(INTERVAL)]} {
+            set interval $::env(INTERVAL)
+            puts "\[[nowtimeAdd]\] interval=$interval (from \$env(INTERVAL))"
+        } else {
+            set interval 10
+            puts "\[[nowtimeAdd]\] interval=$interval (by default)"
+        }
+
         puts "\[[nowtimeAdd]\] ($PROGRAM) Preparing keys for query..."
         #set fd [open "|mg.findColumn | shuf -n 1000000 --random-source=/opt/random10M"]
         set fd [open "|mg.findColumn | shuf -n 1000000"]
@@ -115,7 +125,6 @@ switch -exact -- $PROGRAM {
         puts "\[[nowtimeAdd]\] ($PROGRAM) Query start~"
         set len [llength $ids]
 
-        set interval 10
         set next [clock seconds]
         for {set i 0; set count 0} {true} {incr i; incr count} {
             set id [lindex $ids [expr {$i%$len}]]
@@ -136,7 +145,7 @@ switch -exact -- $PROGRAM {
                     }
                     puts "\[[nowtime $now]\] $count => ID: $id  FILE: $filenames"
                     set count 0
-                    set next [expr {[clock seconds] + 10}]
+                    set next [expr {[clock seconds] + $interval}]
                     continue
                 }
             }
@@ -187,3 +196,8 @@ switch -exact -- $PROGRAM {
 set fd [open "|underscore print --color" w]
 puts $fd $R
 close $fd
+
+# export TEA_LOG=debug
+# doc.query '"metadata.parameter.merchantid":"130010000076040"'
+# get "_id" from return message as "id" next
+# doc.download 'id=54dc53df0356482968b9c9a1'

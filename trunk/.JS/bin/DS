@@ -37,6 +37,7 @@ DS_CFG=$MODULES/DocumentService/config/server.cfg
 JS_CFG=$MODULES/JobScheduler/config/server.cfg
 JS_JOB=$MODULES/JobScheduler/config/job.xml
 DS_SH=$MODULES/DocumentService/bin/startServer.sh
+SE_SH=$MODULES/SearchEngine/bin/startServer.sh
 
 case $PROGRAM in
     dsc.stop)
@@ -188,7 +189,7 @@ case $PROGRAM in
         EVAL diff $DS_CFG.bak $DS_CFG
         echo
 
-        sed -i -e 's@jobscheduler.dataDir=.*$@jobscheduler.dataDir=/TEST/data@' $JS_CFG
+        sed -i -e 's@jobscheduler.dataDir=.*$@jobscheduler.dataDir=/mnt/sjin-TEST/data@' $JS_CFG
         EVAL grep "jobscheduler.dataDir=" $JS_CFG
         echo
 
@@ -208,6 +209,11 @@ case $PROGRAM in
             sed -i -e '2aJVMFLAGS="-Xms2g -Xmx2g -XX:PermSize=200m"' $DS_SH
         fi
         EVAL grep "^JVMFLAGS=" $DS_SH
+
+        if [ `grep -c "^JVMFLAGS=" $SE_SH` -eq 0 ]; then
+            sed -i -e '2aJVMFLAGS="-Xms512m -Xmx512m"' $SE_SH
+        fi
+        EVAL grep "^JVMFLAGS=" $SE_SH
         ;;
 esac
 

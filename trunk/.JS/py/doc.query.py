@@ -17,7 +17,7 @@ parser.add_argument('-r', dest='REPORT', type=int, default=0)
 ARGS = parser.parse_args()
 #TODO support batch for both seconds and iterations
 
-threading.Thread.name = "M"
+threading.current_thread().name = "M"
 if ARGS.DEBUG:
     lvl=logging.DEBUG
 else:
@@ -33,7 +33,8 @@ class TestClient(threading.Thread):
         threading.Thread.__init__(self, name=threading.active_count())
         self.host = host
         self.port = port
-        self.conn = http.client.HTTPSConnection(self.host, self.port)
+        self.conn = http.client.HTTPSConnection(self.host, self.port,
+                timeout=ARGS.BATCH_SIZE*ARGS.BATCHES/2)
         self.count = 0
         #self.conn.set_debuglevel(1)
 
@@ -74,7 +75,7 @@ class TestClient(threading.Thread):
             #for e in dict['response']:
             id = dict['response'][0]["_id"]
             pdf = dict['response'][0]["filename"]
-            if self.doc_download(id, pdf, is_print) and is_print:
+            if self.doc_download(id, pdf, is_print or TestClient.TOTAL_COUNT==0) and is_print:
                 logging.info("%d: %s => %s => %s" % (TestClient.TOTAL_COUNT, merchantid, id, pdf))
         elif is_print:
             dict = json.loads(data.decode())
@@ -109,6 +110,7 @@ class TestClient(threading.Thread):
                 if (TestClient.IS_EXIT):
                     logging.info("Exit")
                     return
+                logging.debug(id)
                 if self.doc_query(id, 
                         ARGS.REPORT>0 and TestClient.TOTAL_COUNT%ARGS.REPORT==0):
                     self.count += 1
@@ -123,7 +125,7 @@ def get_merchantids(host, port, database, username, password):
     db = mg["kyddata"]
     files = db.fs.files
     ids = {row["metadata"]["parameter"]["merchantid"]
-           for row in files.find(fields={"metadata.parameter.merchantid":1,"_id":0}, limit=10001)}
+           for row in files.find(fields={"metadata.parameter.merchantid":1,"_id":0}, limit=1000001)}
     logging.info("Get %d merchantid." % len(ids))
     ids = list(ids);     #logging.info("Listed.")
     random.shuffle(ids); #logging.info("Shuffled.")
@@ -132,11 +134,11 @@ def get_merchantids(host, port, database, username, password):
     return ids
 
 ################################## MAIN ###################################
-ids = get_merchantids('192.168.99.85', 40000, 'kydsystem', 'kyd', 'kyd')
+ids = get_merchantids('192.168.99.242', 40000, 'kydsystem', 'kyd', 'kyd')
 
 tc = list(range(ARGS.THREADS))
 for i in range(ARGS.THREADS):
-    tc[i] = TestClient("192.168.99.85", 9091)
+    tc[i] = TestClient("192.168.99.242", 9091)
     time.sleep(1)
     tc[i].start()
 

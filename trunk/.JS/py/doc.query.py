@@ -12,13 +12,13 @@ parser.add_argument('-t', dest='THREADS', type=int, default=1)
 parser.add_argument('-b', dest='BATCHES', type=int, default=6)
 parser.add_argument('--download', dest='DOWNLOAD', action='store_true')
 parser.add_argument('--batch_size', dest='BATCH_SIZE', type=int, default=100)
-parser.add_argument('--debug', dest='DEBUG', action='store_true')
+parser.add_argument('-v', action='count')
 parser.add_argument('-r', dest='REPORT', type=int, default=0)
 ARGS = parser.parse_args()
 #TODO support batch for both seconds and iterations
 
 threading.current_thread().name = "M"
-if ARGS.DEBUG:
+if ARGS.v>0:
     lvl=logging.DEBUG
 else:
     lvl=logging.INFO
@@ -36,7 +36,8 @@ class TestClient(threading.Thread):
         self.conn = http.client.HTTPSConnection(self.host, self.port,
                 timeout=ARGS.BATCH_SIZE*ARGS.BATCHES/2)
         self.count = 0
-        #self.conn.set_debuglevel(1)
+        if ARGS.v>1:
+            self.conn.set_debuglevel(1)
 
     def close(self):
         self.conn.close()

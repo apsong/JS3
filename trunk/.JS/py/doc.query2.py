@@ -2,7 +2,8 @@
 
 import threading, logging
 import json, random, time, math, base64
-import http.client
+import requests
+requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 from pymongo import MongoClient
 import argparse
 
@@ -21,9 +22,9 @@ threading.current_thread().name = "M"
 if ARGS.v>0:
     lvl=logging.DEBUG
 else:
-    lvl=logging.INFO
+    lvl=logging.WARNING
 logging.basicConfig(format=' [%(asctime)s.%(msecs)03d@%(threadName)s] %(message)s', datefmt='%H:%M:%S', level=lvl)
-logging.info(ARGS)
+logging.warn(ARGS)
 
 class TestClient(threading.Thread):
     TOTAL_COUNT = 0
@@ -33,14 +34,9 @@ class TestClient(threading.Thread):
         threading.Thread.__init__(self, name=threading.active_count())
         self.host = host
         self.port = port
-        self.conn = http.client.HTTPSConnection(self.host, self.port,
-                timeout=ARGS.BATCH_SIZE*ARGS.BATCHES/2)
         self.count = 0
-        if ARGS.v>1:
-            self.conn.set_debuglevel(1)
-
-    def close(self):
-        self.conn.close()
+        #if ARGS.v>1: TODO
+        #    self.conn.set_debuglevel(1)
 
     def parse_response(self):
         resp = self.conn.getresponse()
@@ -51,43 +47,51 @@ class TestClient(threading.Thread):
             logging.error("%d/%d: %d (%s): %s" % (self.count, TestClient.TOTAL_COUNT,
                         resp.code, resp.reason, result['message']))
             return None
-        return result["response"]
+        response = result["response"]
+        return response
+
+    def GET(self, method, params):
+        logging.debug("%s ?" % method)
+        R = requests.get('https://%s:%d/api?method=%s' % (self.host, self.port, method),
+                params=params, verify=False)
+        logging.debug("%s !~~~" % method)
+        return R
+
+    def POST(self, method, json):
+        logging.debug("%s ?" % method)
+        R = requests.post('https://%s:%d/api?method=%s' % (self.host, self.port, method),
+                json=json, verify=False)
+        logging.debug("%s !~~~" % method)
+        return R
 
     def user_authorize(self, userid, password):
-        logging.info("TOKEN?")
-        self.conn.request("POST", "/api?method=user.authorize", \
-            '{"userid":"%s","password":"%s"}' % (userid, password),\
-            {"Content-type":"application/json"})
-        response = self.parse_response()
-        self.token = response['token']
-        logging.info("TOKEN: %s" % (self.token))
+        logging.warn("TOKEN?")
+        R = self.POST("user.authorize", {"userid":"system", "password":"manage"})
+        self.token = R.json()['response']['token']
+        logging.warn("TOKEN: %s" % (self.token))
         return True
 
     def doc_query(self, merchantid, is_print):
-        logging.debug("doc.query?")
-        self.conn.request("POST", "/api?method=doc.query&token="+self.token,\
-            '{"query":{"metadata.parameter.merchantid":"%s"}}' % merchantid,\
-            {"Content-type":"application/json"})
-        response = self.parse_response()
-        if response==None:
+        R = self.POST("doc.query", {"query":{"metadata.parameter.merchantid":merchantid}, "token":self.token})
+        if R.status_code!=200:
             return False
 
+        response = R.json()['response']
         if ARGS.DOWNLOAD:
             id = response[0]["_id"]
             pdf = response[0]["filename"]
             if self.doc_download(id, pdf, is_print or TestClient.TOTAL_COUNT==0) and is_print:
-                logging.info("%d: %s => %s => %s" % (TestClient.TOTAL_COUNT, merchantid, id, pdf))
+                logging.warn("%d: %s => %s => %s" % (TestClient.TOTAL_COUNT, merchantid, id, pdf))
         elif is_print:
-            logging.info("%d: %s => %s" % (TestClient.TOTAL_COUNT, merchantid, " ".join([e['filename'] for e in response])))
+            logging.warn("%d: %s => %s" % (TestClient.TOTAL_COUNT, merchantid, " ".join([e['filename'] for e in response])))
         return True
 
     def doc_download(self, id, pdf, is_save):
-        logging.debug("doc.download?")
-        self.conn.request("GET", "/api?method=doc.download&id=%s&token=%s" % (id, self.token))
-        response = self.parse_response()
-        if response==None:
+        R = self.GET("doc.download", {"id":id, "token":self.token})
+        if R.status_code!=200:
             return False
 
+        response = R.json()['response']
         if is_save:
             with open(pdf, 'wb') as f:
                 f.write(base64.b64decode(response))
@@ -100,7 +104,7 @@ class TestClient(threading.Thread):
         while True:
             for id in ids:
                 if (TestClient.IS_EXIT):
-                    logging.info("Exit")
+                    logging.warn("Exit")
                     return
                 logging.debug(id)
                 if self.doc_query(id, 
@@ -109,7 +113,7 @@ class TestClient(threading.Thread):
                     TestClient.TOTAL_COUNT += 1
 
 def get_merchantids(host, port, database, username, password):
-    logging.info("Connect to mongo://{3}:{4}@{0}:{1}/{2} for merchantid.".format(
+    logging.warn("Connect to mongo://{3}:{4}@{0}:{1}/{2} for merchantid.".format(
                 host,port,database,username,password))
     mg = MongoClient(host, port)
     db = mg[database]
@@ -118,9 +122,9 @@ def get_merchantids(host, port, database, username, password):
     files = db.fs.files
     ids = {row["metadata"]["parameter"]["merchantid"]
            for row in files.find(fields={"metadata.parameter.merchantid":1,"_id":0}, limit=1001)}
-    logging.info("Get %d merchantid." % len(ids))
-    ids = list(ids);     #logging.info("Listed.")
-    random.shuffle(ids); #logging.info("Shuffled.")
+    logging.warn("Get %d merchantid." % len(ids))
+    ids = list(ids);     #logging.warn("Listed.")
+    random.shuffle(ids); #logging.warn("Shuffled.")
 
     mg.close()
     return ids
@@ -145,7 +149,7 @@ while (time.time() < end):
         next += ARGS.BATCH_SIZE
         counts = [tc[i].count for i in range(ARGS.THREADS)]
         report_list.append(TestClient.TOTAL_COUNT-last_total)
-        logging.info("+%d = %d (%s)" % (TestClient.TOTAL_COUNT-last_total,
+        logging.warn("+%d = %d (%s)" % (TestClient.TOTAL_COUNT-last_total,
                     TestClient.TOTAL_COUNT,
                     "".join(map(lambda i: " +%d" % i, [a-b for a,b in zip(counts, last_counts)]))))
 
@@ -156,8 +160,6 @@ else:
 
 for i in range(ARGS.THREADS):
     tc[i].join()
-for i in range(ARGS.THREADS):
-    tc[i].close()
 
 ######################### Final Report ######################################
 report_list = report_list[(len(report_list)-1)//3+1:]
@@ -166,6 +168,6 @@ if ARGS.DOWNLOAD:
     d = "&download"
 else:
     d= ""
-logging.info("%d thread(s): %.1f doc.query%s/second  <= (%s)/%d/%d" % 
+logging.warn("%d thread(s): %.1f doc.query%s/second  <= (%s)/%d/%d" % 
         (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.BATCH_SIZE, d,
          "+".join(map(str, report_list)), len(report_list), ARGS.BATCH_SIZE))

@@ -56,7 +56,7 @@ proc jsonPost {_RESULT url json} {
 ##################################################################################
 set PROGRAM [file tail $argv0]
 
-set HOST 192.168.99.85
+set HOST 192.168.99.242
 set PORT 9091
 set URL_BASE https://$HOST:$PORT
 
@@ -68,8 +68,8 @@ if {[catch {dict get [::json::json2dict $R] response token} token]} {
 
 switch -exact -- $PROGRAM {
     job.submit {
-        set rpt /public/daily.rptdesign
-        #set rpt daily.rptdesign
+        #set rpt /public/daily.rptdesign
+        set rpt daily.rptdesign
 
         foreach arg $argv {
             switch -glob -- $arg {

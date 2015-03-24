@@ -26,9 +26,16 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 }
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 
-for A in "" "--download"; do
-    for I in `seq 4 -1 1`; do
-        EVAL doc.query.py -t $I $A
+EVAL file.manage.py -H 192.168.99.242 .rm    /{1,2,3,4}t
+EVAL file.manage.py -H 192.168.99.242 .mkdir /{1,2,3,4}t
+echo
+#for D in "100x10000x1K" "100x10000x1M"; do
+for D in "100x10000x1M"; do
+    for T in `seq 4`; do
+        EVAL file.manage.py -H 192.168.99.242 .upload $D /${T}t -t $T
+        sleep 60
+        echo
+        EVAL file.manage.py -H 192.168.99.242 .rm /${T}t/$D
         sleep 60
         echo
     done

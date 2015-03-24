@@ -197,8 +197,8 @@ case $PROGRAM in
         ln -sv $MODULES/DocumentService/repository $DIR/../repository
         rm -rf $MODULES/DocumentService/reportEngine/resource
         ln -sv /TEST/resource $MODULES/DocumentService/reportEngine
-        rm -f $DIR/fonts
-        ln -sv /TEST/fonts $DIR
+        rm -rf $DIR/fonts
+        ln -sv /mnt/sjin-TEST/fonts $DIR
         echo
 
         #rm -v $MODULES/DocumentService/reportEngine/plugins/PavoDataEngine*.jar

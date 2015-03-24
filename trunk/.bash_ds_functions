@@ -40,6 +40,34 @@ ds.log()
     echo 1>&2 "Error: Incorrect work dir."
 }
 
+dsc.log()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/DocumentServiceConsole/logs
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+
+se.log()
+{
+    DIR=$PWD
+    while [ "$DIR" != "/" ]; do
+        if [ -f $DIR/install.sh ]; then
+            cd $DIR/modules/SearchEngine/logs
+            return
+        else
+            DIR=`dirname $DIR`
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+}
+
 js.cfg()
 {
     DIR=$PWD

@@ -5,7 +5,8 @@ from pathlib import PosixPath
 import logging, argparse
 import threading, time
 import json, base64
-import http.client
+import http.client, requests
+requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 from queue import Queue
 
 class TestClient(threading.Thread):
@@ -21,23 +22,23 @@ class TestClient(threading.Thread):
         self.task_q = task_q
 
     def close(self):
-        logging.debug("close")
+        logging.info("close")
         self.conn.close()
 
     def user_authorize(self, userid, password):
-        logging.info("TOKEN?")
+        logging.warn("TOKEN?")
         self.conn.request("POST", "/api?method=user.authorize", \
             '{"userid":"%s","password":"%s"}' % (userid, password),\
             {"Content-type":"application/json"})
         self.token = TestClient._parse_response(self.conn)['token']
-        logging.info("TOKEN: %s" % (self.token))
+        logging.warn("TOKEN: %s" % (self.token))
         return True
 
     def _parse_response(conn):
         resp = conn.getresponse()
         result = json.loads(str(resp.read(), 'utf-8'))
         if logging.getLogger().isEnabledFor(logging.DEBUG):
-            logging.debug("--> %s" % json.dumps(result, indent=2))
+            logging.info("--> %s" % json.dumps(result, indent=2))
         if (resp.code != 200):
             logging.error("%d (%s): %s" % (resp.code, resp.reason, result['message']))
             return None
@@ -46,32 +47,37 @@ class TestClient(threading.Thread):
     def _check_response(conn):
         resp = conn.getresponse()
         read = resp.read()
-        logging.debug(read)
+        #logging.info(read)
         if (resp.code != 200 or logging.getLogger().isEnabledFor(logging.DEBUG)):
             result = json.loads(str(read, 'utf-8'))
             if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug("--> %s" % json.dumps(result, indent=2))
+                logging.info("--> %s" % json.dumps(result, indent=2))
             if resp.code != 200:
                 logging.error("%d (%s): %s" % (resp.code, resp.reason, result['message']))
                 return False
         return True
 
     def do_mkdir(self, dir_name, remote_dir):
-        logging.debug("file.add dir?")
+        logging.info("file.add dir?")
         self.conn.request("POST", "/api?method=file.add&token="+self.token,\
             '{"fileName":"%s", "filePath":"%s", "fileType":"1", "owner":"*"}' % (dir_name, remote_dir),\
             {"Content-type":"application/json"})
         return TestClient._check_response(self.conn)
 
     def do_upload(self, local_file, remote_dir):
-        logging.debug("file.add file?")
-        self.conn.request("POST", "/api?method=file.add&token="+self.token,\
-            '{"fileName":"%s", "filePath":"%s", "fileType":"0", "owner":"*"}' % (local_file, remote_dir),\
-            {"Content-type":"application/json"})
-        return TestClient._check_response(self.conn)
+        logging.info("file.add file?")
+        R=requests.post("https://%s:%d/api?method=file.add&token=%s" % (self.host, self.port, self.token),
+                files={"file":open(local_file, "rb")},
+                data={"fileName":os.path.basename(local_file),"filePath":remote_dir,
+                        "fileType":"0", "owner":"*"},
+                verify=False)
+        if R.status_code!=200:
+            logging.error(R.text)
+            return False
+        return True
 
     def do_download(self, remote_file, local_dir):
-        logging.debug("file.download?")
+        logging.info("file.download?")
         self.conn.request("POST", "/api?method=file.download&token="+self.token,\
             '{"path":"%s"}' % remote_file,\
             {"Content-type":"application/json"})
@@ -81,14 +87,14 @@ class TestClient(threading.Thread):
             f.write(base64.b64decode(R))
 
     def do_delete(self, files):
-        logging.debug("file.delete?")
+        logging.info("file.delete?")
         self.conn.request("POST", "/api?method=file.delete&token="+self.token,\
             '{"filePaths":["%s"]}' % '","'.join(files),\
             {"Content-type":"application/json"})
         return TestClient._check_response(self.conn)
 
     def do_rename(self, path, new_name):
-        logging.debug("file.rename?")
+        logging.info("file.rename?")
         self.conn.request("POST", "/api?method=file.rename&token="+self.token,\
             '{"path":"%s", "newFileName":"%s"}' % (path, new_name),\
             {"Content-type":"application/json"})
@@ -98,14 +104,14 @@ class TestClient(threading.Thread):
         print("%3s %-30s %-40s %s" % (F["fileType"]==1 and "[d]" or "   ", F["path"], F["attributes"], F["lastModifiedTime"]))
 
     def _stat(self, path):
-        logging.debug("file.query.path?")
+        logging.info("file.query.path?")
         self.conn.request("POST", "/api?method=file.query.path&token="+self.token,\
             '{"path":"%s"}' % path,\
             {"Content-type":"application/json"})
         return TestClient._parse_response(self.conn)
 
     def _stat2(self, path):
-        logging.debug("file.query?")
+        logging.info("file.query?")
         self.conn.request("POST", "/api?method=file.query&token="+self.token,\
             '{"path":"%s"}' % path,\
             {"Content-type":"application/json"})
@@ -135,7 +141,7 @@ class TestClient(threading.Thread):
             return
         while True:
             task = self.task_q.get()
-            logging.debug(task)
+            logging.info(task)
 
             if task[0] == 'UPLOAD':
                 p = PosixPath(task[1])
@@ -146,8 +152,6 @@ class TestClient(threading.Thread):
                             self.task_q.put(['UPLOAD', str(f), target_dir])
                 else:
                     self.do_upload(str(p), task[2])
-
-                print(task[0])
             elif task[0] == 'DOWNLOAD':
                 R = self._stat(task[1])
                 if R["fileType"]==1: #dir
@@ -158,6 +162,8 @@ class TestClient(threading.Thread):
                         self.task_q.put(['DOWNLOAD', r["path"], target_dir])
                 else:
                     self.do_download(task[1], task[2])
+            elif task[0] == 'MKDIR':
+                self.do_mkdir(os.path.basename(task[1]), os.path.dirname(task[1]))
             elif task[0] == 'STAT':
                 self.do_stat(task[1])
             elif task[0] == 'LS':
@@ -170,7 +176,7 @@ class TestClient(threading.Thread):
                 self.do_delete(task[1])
             elif task[0] == 'EXIT':
                 self.close()
-                logging.debug("Exit.")
+                logging.info("Exit.")
                 self.task_q.task_done()
                 return
             else:
@@ -186,7 +192,8 @@ PROGRAM=os.path.basename(sys.argv[0])
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 #parser.add_argument('-r', action='store_true')
-parser.add_argument('OPERATOR', choices=['.upload', '.download', '.rm', '.stat', '.ls', '.lsr', '.rename'])
+parser.add_argument('OPERATOR',
+        choices=['.upload', '.download', '.mkdir', '.rm', '.stat', '.ls', '.lsr', '.rename'])
 parser.add_argument('FILE', nargs='+')
 parser.add_argument('-H', dest='HOST', required=True, help='remote host')
 parser.add_argument('-v', action='count', default=0)
@@ -194,19 +201,21 @@ parser.add_argument('--threads', '-t', type=int, default=1, help='Number of work
 ARGS = parser.parse_args()
 
 threading.current_thread().name = "M"
-if ARGS.v>0:
-    lvl=logging.DEBUG
-else:
+if ARGS.v==0:
+    lvl=logging.WARNING
+elif ARGS.v==1:
     lvl=logging.INFO
+else:
+    lvl=logging.DEBUG
 logging.basicConfig(format=' [%(asctime)s.%(msecs)03d@%(threadName)s] %(message)s', datefmt='%H:%M:%S', level=lvl)
-logging.info(ARGS)
+logging.warn(ARGS)
 
 q = Queue()
 for i in range(ARGS.threads):
-    t = TestClient(ARGS.HOST, '9091', q)
+    t = TestClient(ARGS.HOST, 9091, q)
     #t.daemon = True
     t.start()
-    #time.sleep(1)
+    time.sleep(1)
 
 if ARGS.OPERATOR == '.upload':
     if len(ARGS.FILE)==1:
@@ -222,6 +231,9 @@ if ARGS.OPERATOR == '.download':
     else:
         for f in ARGS.FILE[0:-1]:
             q.put(['DOWNLOAD', f, ARGS.FILE[-1]])
+elif ARGS.OPERATOR == '.mkdir':
+    for f in ARGS.FILE:
+        q.put(['MKDIR', f])
 elif ARGS.OPERATOR == '.rm':
     q.put(['REMOVE', ARGS.FILE])
 elif ARGS.OPERATOR == '.stat':
@@ -242,10 +254,10 @@ elif ARGS.OPERATOR == '.rename':
 q.join()
 
 ############################# RESULT ##########################
-print("======================= ERRORS: %d ======================" % len(TestClient.ERRORS))
+logging.warn("====================== ERRORS: %d ======================" % len(TestClient.ERRORS))
 for msg in TestClient.ERRORS:
     print(msg)
 ############################# CLEAN UP ##########################
 for i in range(ARGS.threads):
     q.put(['EXIT'])
-logging.debug("Finished.")
+logging.info("Finished.")

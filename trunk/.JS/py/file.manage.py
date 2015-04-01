@@ -15,10 +15,10 @@ class TestClient(threading.Thread):
         threading.Thread.__init__(self, name=threading.active_count())
         self.host = host
         self.port = port
-        self.conn = http.client.HTTPSConnection(self.host, self.port, timeout=60)
+        self.conn = http.client.HTTPSConnection(self.host, self.port, timeout=3600)
         self.conn.connect()
         if ARGS.v>1:
-            self.conn.set_debuglevel(1)
+            http.client.HTTPConnection.debuglevel=1
         self.task_q = task_q
 
     def close(self):
@@ -148,7 +148,9 @@ class TestClient(threading.Thread):
                 if p.is_dir():
                     target_dir = os.path.join(task[2], p.name)
                     if self.do_mkdir(p.name, task[2]):
-                        for f in p.iterdir():
+                        children = [d for d in p.iterdir()]
+                        children.sort()
+                        for f in children:
                             self.task_q.put(['UPLOAD', str(f), target_dir])
                 else:
                     self.do_upload(str(p), task[2])

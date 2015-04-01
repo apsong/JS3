@@ -37,7 +37,8 @@ class TestClient(threading.Thread):
                 timeout=ARGS.BATCH_SIZE*ARGS.BATCHES/2)
         self.count = 0
         if ARGS.v>1:
-            self.conn.set_debuglevel(1)
+            #self.conn.set_debuglevel(1)
+            http.client.HTTPConnection.debuglevel=1
 
     def close(self):
         self.conn.close()

@@ -23,7 +23,7 @@ def mkdirs(bases, number):
     new_bases=[]
     format = "%%0%dd" % len("%d" % (number-1))
     for i in range(number):
-        dir = os.path.join(random.choice(bases), format % i)
+        dir = os.path.join(bases[i % len(bases)], format % i)
         logging.info("mkdir %s" % dir)
         PosixPath(dir).mkdir()
         new_bases.append(dir)
@@ -35,7 +35,7 @@ def mklinks(bases, number, filename):
     src_file = "/TEST/dat/%s" % filename
     format = "%%0%dd_%%s" % len("%d" % (number-1))
     for i in range(number):
-        link = os.path.join(random.choice(bases), format % (i, filename))
+        link = os.path.join(bases[i % len(bases)], format % (i, filename))
         logging.info("ln -s %s %s" % (src_file, link))
         PosixPath(link).symlink_to(src_file)
         #new_bases.append(link)

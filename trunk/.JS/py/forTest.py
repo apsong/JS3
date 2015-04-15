@@ -8,7 +8,7 @@ from pathlib import PosixPath
 parser = argparse.ArgumentParser(description='Prepare directories and files for test',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('DIR_NUMS', type=int, default=10, nargs='+', help='number of directories per level')
-parser.add_argument('FILE', choices=['1B.dat', '1K.dat', '1M.dat', '10M.dat', '100M.dat'])
+parser.add_argument('FILE', choices=['1B', '1K', '1M', '10M', '100M'])
 parser.add_argument('-v', default=0, action='count', help='Verbose output. "-vv" is more than "-v"')
 ARGS=parser.parse_args()
 
@@ -42,7 +42,7 @@ def mklinks(bases, number, filename):
     logging.warn("mklinks([%s - %s], %d, %s) finished." % (bases[0], bases[-1], number, filename))
     #return new_bases
 
-dir_base="x".join(map(str, ARGS.DIR_NUMS)) + ("x%s" % os.path.splitext(ARGS.FILE)[0])
+dir_base="x".join(map(str, ARGS.DIR_NUMS)) + ("x%s" % ARGS.FILE)
 
 logging.warn("mkdir %s" % dir_base)
 PosixPath(dir_base).mkdir()
@@ -50,4 +50,4 @@ PosixPath(dir_base).mkdir()
 bases=[dir_base]
 for num in ARGS.DIR_NUMS[:-1]:
     bases=mkdirs(bases, num)
-mklinks(bases, ARGS.DIR_NUMS[-1], ARGS.FILE)
+mklinks(bases, ARGS.DIR_NUMS[-1], ARGS.FILE + ".dat")

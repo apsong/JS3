@@ -8,6 +8,7 @@ import json, base64
 import http.client, requests
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 from queue import Queue
+import datetime
 
 class TestClient(threading.Thread):
     ERRORS = list()
@@ -217,7 +218,9 @@ for i in range(ARGS.threads):
     t = TestClient(ARGS.HOST, 9091, q)
     #t.daemon = True
     t.start()
-    time.sleep(1)
+    #time.sleep(1)
+
+begin=datetime.datetime.today()
 
 if ARGS.OPERATOR == '.upload':
     if len(ARGS.FILE)==1:
@@ -256,7 +259,9 @@ elif ARGS.OPERATOR == '.rename':
 q.join()
 
 ############################# RESULT ##########################
-logging.warn("====================== ERRORS: %d ======================" % len(TestClient.ERRORS))
+end=datetime.datetime.today()
+logging.warn("====================== ERRORS: %d / DURATION: %s ======================" %
+        (len(TestClient.ERRORS), str(datetime.timedelta(seconds=round((end-begin).total_seconds())))))
 for msg in TestClient.ERRORS:
     print(msg)
 ############################# CLEAN UP ##########################

@@ -73,7 +73,7 @@ switch -exact -- $PROGRAM {
 
         foreach arg $argv {
             switch -glob -- $arg {
-                *.csv       { lappend csvs [regsub {/TEST/data/} $arg {}] }
+                *.csv       { lappend csvs [regsub {.*TEST/data/} $arg {}] }
                 *.rptdesign { set rpt $arg }
                 default     { error "($PROGRAM)Error: unknown argument '$arg'" }
             }

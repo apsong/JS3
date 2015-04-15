@@ -2,7 +2,7 @@
 
 import threading, logging
 import json, random, time, math, base64
-from http.client import HTTPSConnection, HTTPConnection
+from httplib import HTTPSConnection, HTTPConnection
 import argparse
 
 parser = argparse.ArgumentParser(description='Start threads to doc.query repeately.',
@@ -23,6 +23,30 @@ else:
     lvl=logging.INFO
 logging.basicConfig(format=' [%(asctime)s.%(msecs)03d@%(threadName)s] %(message)s', datefmt='%H:%M:%S', level=lvl)
 logging.info(ARGS)
+
+
+# Check if running in Jython
+import sys
+if 'java' in sys.platform:
+    from javax.net.ssl import TrustManager, X509TrustManager
+    from jarray import array
+    from javax.net.ssl import SSLContext
+    class TrustAllX509TrustManager(X509TrustManager):
+        '''Define a custom TrustManager which will blindly accept all certificates'''
+        def checkClientTrusted(self, chain, auth):
+            pass
+
+        def checkServerTrusted(self, chain, auth):
+            pass
+
+        def getAcceptedIssuers(self):
+            return None
+    # Create a static reference to an SSLContext which will use
+    # our custom TrustManager
+    trust_managers = array([TrustAllX509TrustManager()], TrustManager)
+    TRUST_ALL_CONTEXT = SSLContext.getInstance("SSL")
+    TRUST_ALL_CONTEXT.init(None, trust_managers, None)
+    SSLContext.setDefault(TRUST_ALL_CONTEXT)
 
 class TestClient(threading.Thread):
     TOTAL_COUNT = 0

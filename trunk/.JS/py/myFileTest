@@ -26,17 +26,16 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 }
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 
-EVAL file.manage.py -H 192.168.99.242 .rm    /{1,2,3,4}t -vv
+EVAL file.manage.py -H 192.168.99.242 .rm    /{1,2,3,4}t
 EVAL file.manage.py -H 192.168.99.242 .mkdir /{1,2,3,4}t
 echo
-#for D in "100x10000x1M" "100x10000x1K"; do
-for D in "100x1000x1M"; do
+for D in "100x10000x1M" "100x10000x1K"; do
     for T in `seq 4`; do
         EVAL file.manage.py -H 192.168.99.242 .upload $D /${T}t -t $T
-        find /tmp -maxdepth 1 -name '[0-9a-f][0-9a-f]*[0-9a-f]' -exec rm -f {} \;
+        EVAL ssh test-centos cleanTmp
         sleep 10
         echo
-        EVAL file.manage.py -H 192.168.99.242 .rm /${T}t/$D -vv
+        EVAL file.manage.py -H 192.168.99.242 .rm /${T}t/$D
         sleep 10
         echo
     done

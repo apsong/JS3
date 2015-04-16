@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description='Start threads to doc.query repeate
 parser.add_argument('-t', dest='THREADS', type=int, default=1)
 parser.add_argument('-b', dest='BATCHES', type=int, default=6)
 parser.add_argument('--download', dest='DOWNLOAD', action='store_true')
+parser.add_argument('--benchmark', action='store_true')
 parser.add_argument('--batch_size', dest='BATCH_SIZE', type=int, default=100)
 parser.add_argument('-v', action='count', default=0)
 parser.add_argument('-r', dest='REPORT', type=int, default=0)
@@ -66,6 +67,21 @@ class TestClient(threading.Thread):
         logging.info("TOKEN: %s" % (self.token))
         return True
 
+    def benchmark(self, is_print):
+        self.conn.request("GET", "/api?method=job.type.list&token="+self.token)
+        resp = self.conn.getresponse()
+        read = resp.read()
+        if (resp.status != 200):
+            result = json.loads(read.decode('utf-8'))
+            logging.error("%d/%d: %d (%s): %s" % (self.count, TestClient.TOTAL_COUNT,
+                        resp.status, resp.reason, result['message']))
+            return False
+        if is_print:
+            result = json.loads(read.decode('utf-8'))
+            #logging.info("job.type.list: %s" % json.dumps(result, indent=2))
+            logging.info("job.type.list-> name : %s" % result["response"][0]["name"])
+        return True
+
     def doc_query(self, merchantid, is_print):
         logging.debug("doc.query?")
         self.conn.request("POST", "/api?method=doc.query&token="+self.token,\
@@ -99,6 +115,13 @@ class TestClient(threading.Thread):
     def run(self):
         global ARGS
         if not self.user_authorize('system', 'manage'):
+            return
+        if ARGS.benchmark:
+            while not TestClient.IS_EXIT:
+                if self.benchmark(ARGS.REPORT>0 and TestClient.TOTAL_COUNT%ARGS.REPORT==0):
+                    self.count += 1
+                    TestClient.TOTAL_COUNT += 1
+            logging.info("Exit")
             return
         while True:
             for id in self.ids:

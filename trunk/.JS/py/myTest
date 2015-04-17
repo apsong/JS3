@@ -27,7 +27,7 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 
 for A in "query" "download"; do
-    for I in `seq 4`; do
+    for I in 1 2 4 6 8 10 12 16; do
         EVAL doc.manage.py $A -t $I -b 6
         sleep 60
         echo

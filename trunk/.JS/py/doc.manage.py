@@ -9,10 +9,10 @@ parser = argparse.ArgumentParser(description='Start threads to doc.query repeate
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('ACTION', default='query', choices={'query', 'download', 'ping', 'benchmark'})
 parser.add_argument('-t', dest='THREADS', type=int, default=1)
-parser.add_argument('-b', dest='BATCHES', type=int, default=6)
-parser.add_argument('-B', dest='BATCH_SIZE', type=int, default=100)
-parser.add_argument('--keyfile', default="")
+parser.add_argument('-b', dest='BATCH_NUM', type=int, default=6)
+parser.add_argument('-B', dest='BATCH_SECONDS', type=int, default=100)
 parser.add_argument('--report', type=int, default=0)
+parser.add_argument('--no_verify', action='store_true', default=True)
 parser.add_argument('-v', action='count', default=0)
 ARGS = parser.parse_args()
 #TODO support batch for both seconds and iterations
@@ -33,7 +33,7 @@ class TestClient(multiprocessing.Process):
         self.counter = counter
         self.IS_EXIT = IS_EXIT
         self.conn = HTTPSConnection(self.host, self.port,
-                timeout=ARGS.BATCH_SIZE*ARGS.BATCHES/2)
+                timeout=ARGS.BATCH_SECONDS*ARGS.BATCH_NUM/2)
         self.ids = list(ids)
         if ARGS.v>1:
             #self.conn.set_debuglevel(1)
@@ -92,7 +92,7 @@ class TestClient(multiprocessing.Process):
             logging.info("job.type.list-> name : %s" % result["response"][0]["name"])
         return True
 
-    def doc_query(self, merchantid, is_print):
+    def doc_query(self, merchantid, expected_pdf, is_print):
         logging.debug("doc.query?")
         self.conn.request("POST", "/api?method=doc.query&token="+self.token,\
             '{"query":{"metadata.parameter.merchantid":"%s"}}' % merchantid,\
@@ -104,8 +104,12 @@ class TestClient(multiprocessing.Process):
         if ARGS.ACTION[0]=="d": #download
             id = response[0]["_id"]
             pdf = response[0]["filename"]
-            if self.doc_download(id, pdf, is_print or self.counter.value==0) and is_print:
+            if self.doc_download(id, pdf, is_print) and is_print:
                 logging.info("%d: %s => %s => %s" % (self.counter.value, merchantid, id, pdf))
+        elif not ARGS.no_verify:
+            if expected_pdf not in [e["filename"] for e in response]:
+                logging.warn("VERIFY FAILED: id: %s => expected %s, but got %s" %
+                        (merchantid, expected_pdf, json.dumps(response, indent=2)))
         elif is_print:
             logging.info("%d: %s => %s" % (self.count, merchantid, " ".join([e['filename'] for e in response])))
         return True
@@ -140,12 +144,12 @@ class TestClient(multiprocessing.Process):
             self.close()
             return
         while True:
-            for id in self.ids:
+            for id, pdf in self.ids:
                 if self.IS_EXIT.value:
                     self.close()
                     return
                 logging.debug(id)
-                if self.doc_query(id, 
+                if self.doc_query(id, pdf,
                         ARGS.report>0 and self.counter.value%ARGS.report==0):
                     self.counter.value += 1
 
@@ -158,27 +162,31 @@ def get_merchantids_from_db(host, port, database, username, password):
     db.authenticate(username, password)
     db = mg["kyddata"]
     files = db.fs.files
-    ids = {row["metadata"]["parameter"]["merchantid"]
-           for row in files.find(projection={"metadata.parameter.merchantid":1,"_id":0}, limit=1000001)}
+    ids = {(row["metadata"]["parameter"]["merchantid"],row["filename"])
+        for row in files.find(projection={"metadata.parameter.merchantid":1,"filename":1,"_id":0}, limit=11)}
     ids = list(ids);     #set -> list
     logging.info("Get %d merchantid: [%s ... %s]" % (len(ids), ids[0], ids[-1]))
 
     mg.close()
     return ids
 
-def get_merchantids_from_file(keyfile):
-    import os
+def get_merchantids():
+    import os, pickle
+    keyfile = "./id_pdf.pickle"
     if os.access(keyfile, os.R_OK):
-        with open(keyfile) as f:
-            ids = [line.rstrip() for line in f]
-            return ids
-    return None
+        with open(keyfile, 'rb') as f:
+            #ids = [line.rstrip() for line in f]
+            ids = pickle.load(f)
+        logging.info("Load (id,pdf) tuple from %s" % keyfile)
+    else:
+        ids = get_merchantids_from_db('192.168.99.242', 40000, 'kydsystem', 'kyd', 'kyd')
+        with open(keyfile, 'wb') as f:
+            pickle.dump(ids, f)
+        logging.info("Save (id,pdf) tuple into %s" % keyfile)
+    return ids
 
 ################################## MAIN ###################################
-IDS = get_merchantids_from_file(ARGS.keyfile) 
-if IDS == None:
-    IDS = get_merchantids_from_db('192.168.99.242', 40000, 'kydsystem', 'kyd', 'kyd')
-
+IDS = get_merchantids()
 IS_EXIT = multiprocessing.Value('i', 0, lock=False)
 
 counters = list(range(ARGS.THREADS))
@@ -193,11 +201,11 @@ last_counts = [0] * ARGS.THREADS
 last_total  = 0
 report_list = list()
 next = time.time()
-end  = time.time() + ARGS.BATCH_SIZE * ARGS.BATCHES
+end  = time.time() + ARGS.BATCH_SECONDS * ARGS.BATCH_NUM
 while (time.time() < end):
     time.sleep(1)
     if (time.time() >= next):
-        next += ARGS.BATCH_SIZE
+        next += ARGS.BATCH_SECONDS
         counts = [counters[i].value for i in range(ARGS.THREADS)]
         total = sum(counts)
         report_list.append(total-last_total)
@@ -224,5 +232,5 @@ elif ARGS.ACTION == "download":
 else:
     cmd = "doc.query"
 logging.info("%d thread(s): %.1f %s/second  <= (%s)/%d/%d" % 
-        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.BATCH_SIZE, cmd,
-         "+".join(map(str, report_list)), len(report_list), ARGS.BATCH_SIZE))
+        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.BATCH_SECONDS, cmd,
+         "+".join(map(str, report_list)), len(report_list), ARGS.BATCH_SECONDS))

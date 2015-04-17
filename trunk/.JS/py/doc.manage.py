@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(description='Start threads to doc.query repeate
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-t', dest='THREADS', type=int, default=1)
 parser.add_argument('-b', dest='BATCHES', type=int, default=6)
-parser.add_argument('ACTION', choices={'query', 'download', 'ping', 'benchmark'}, default='query')
+parser.add_argument('ACTION', default='query', choices={'query', 'download', 'ping', 'benchmark'})
 parser.add_argument('--batch_size', dest='BATCH_SIZE', type=int, default=100)
 parser.add_argument('-v', action='count', default=0)
 parser.add_argument('-r', dest='REPORT', type=int, default=0)
@@ -174,52 +174,51 @@ def get_merchantids(host, port, database, username, password):
     return ids
 
 ################################## MAIN ###################################
-if __name__ == '__main__':
-    TestClient.ids = get_merchantids('192.168.99.242', 40000, 'kydsystem', 'kyd', 'kyd')
-    IS_EXIT = multiprocessing.Value('i', 0, lock=False)
+TestClient.ids = get_merchantids('192.168.99.242', 40000, 'kydsystem', 'kyd', 'kyd')
+IS_EXIT = multiprocessing.Value('i', 0, lock=False)
 
-    counters = list(range(ARGS.THREADS))
-    tc = list(range(ARGS.THREADS))
-    for i in range(ARGS.THREADS):
-        random.shuffle(TestClient.ids)
-        counters[i] = multiprocessing.Value('i', 0, lock=False)
-        tc[i] = TestClient("%s" % (i+1), "192.168.99.242", 9091, counters[i], IS_EXIT)
-        tc[i].start()
+counters = list(range(ARGS.THREADS))
+tc = list(range(ARGS.THREADS))
+for i in range(ARGS.THREADS):
+    random.shuffle(TestClient.ids)
+    counters[i] = multiprocessing.Value('i', 0, lock=False)
+    tc[i] = TestClient("%s" % (i+1), "192.168.99.242", 9091, counters[i], IS_EXIT)
+    tc[i].start()
 
-    last_counts = [0] * ARGS.THREADS
-    last_total  = 0
-    report_list = list()
-    next = time.time()
-    end  = time.time() + ARGS.BATCH_SIZE * ARGS.BATCHES
-    while (time.time() < end):
-        time.sleep(1)
-        if (time.time() >= next):
-            next += ARGS.BATCH_SIZE
-            counts = [counters[i].value for i in range(ARGS.THREADS)]
-            total = sum(counts)
-            report_list.append(total-last_total)
-            logging.info("+%d = %d (%s)" % (total-last_total, total,
-                        "".join(map(lambda i: " +%d" % i, [a-b for a,b in zip(counts, last_counts)]))))
+last_counts = [0] * ARGS.THREADS
+last_total  = 0
+report_list = list()
+next = time.time()
+end  = time.time() + ARGS.BATCH_SIZE * ARGS.BATCHES
+while (time.time() < end):
+    time.sleep(1)
+    if (time.time() >= next):
+        next += ARGS.BATCH_SIZE
+        counts = [counters[i].value for i in range(ARGS.THREADS)]
+        total = sum(counts)
+        report_list.append(total-last_total)
+        logging.info("+%d = %d (%s)" % (total-last_total, total,
+                    "".join(map(lambda i: " +%d" % i, [a-b for a,b in zip(counts, last_counts)]))))
 
-            last_counts = counts
-            last_total = total
-    else:
-        IS_EXIT.value = 1
+        last_counts = counts
+        last_total = total
+else:
+    IS_EXIT.value = 1
 
-    for i in range(ARGS.THREADS):
-        tc[i].join(10)
+for i in range(ARGS.THREADS):
+    tc[i].join(10)
 
-    ######################### Final Report ######################################
-    report_list = report_list[(len(report_list)-1)//3+1:]
+######################### Final Report ######################################
+report_list = report_list[(len(report_list)-1)//3+1:]
 
-    if ARGS.ACTION == "benchmark":
-        cmd = "job.type.list"
-    elif ARGS.ACTION == "ping":
-        cmd = "ping"
-    elif ARGS.ACTION == "download":
-        cmd = "doc.query&download"
-    else:
-        cmd = "doc.query"
-    logging.info("%d thread(s): %.1f %s/second  <= (%s)/%d/%d" % 
-            (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.BATCH_SIZE, cmd,
-             "+".join(map(str, report_list)), len(report_list), ARGS.BATCH_SIZE))
+if ARGS.ACTION == "benchmark":
+    cmd = "job.type.list"
+elif ARGS.ACTION == "ping":
+    cmd = "ping"
+elif ARGS.ACTION == "download":
+    cmd = "doc.query&download"
+else:
+    cmd = "doc.query"
+logging.info("%d thread(s): %.1f %s/second  <= (%s)/%d/%d" % 
+        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.BATCH_SIZE, cmd,
+         "+".join(map(str, report_list)), len(report_list), ARGS.BATCH_SIZE))

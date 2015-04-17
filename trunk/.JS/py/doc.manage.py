@@ -1,18 +1,19 @@
 #! /usr/bin/env pypy3
 
+import argparse
 import multiprocessing, logging
 import json, random, time, math, base64
 from http.client import HTTPSConnection, HTTPConnection
-import argparse
 
 parser = argparse.ArgumentParser(description='Start threads to doc.query repeately.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('ACTION', default='query', choices={'query', 'download', 'ping', 'benchmark'})
 parser.add_argument('-t', dest='THREADS', type=int, default=1)
 parser.add_argument('-b', dest='BATCHES', type=int, default=6)
-parser.add_argument('ACTION', default='query', choices={'query', 'download', 'ping', 'benchmark'})
-parser.add_argument('--batch_size', dest='BATCH_SIZE', type=int, default=100)
+parser.add_argument('-B', dest='BATCH_SIZE', type=int, default=100)
+parser.add_argument('--keyfile', default="")
+parser.add_argument('--report', type=int, default=0)
 parser.add_argument('-v', action='count', default=0)
-parser.add_argument('-r', dest='REPORT', type=int, default=0)
 ARGS = parser.parse_args()
 #TODO support batch for both seconds and iterations
 
@@ -25,7 +26,7 @@ logging.basicConfig(format=' [%(asctime)s.%(msecs)03d@%(processName)s] %(message
 logging.info(ARGS)
 
 class TestClient(multiprocessing.Process):
-    def __init__(self, name, host, port, counter, IS_EXIT):
+    def __init__(self, name, host, port, ids, counter, IS_EXIT):
         multiprocessing.Process.__init__(self, name=name)
         self.host = host
         self.port = port
@@ -33,8 +34,7 @@ class TestClient(multiprocessing.Process):
         self.IS_EXIT = IS_EXIT
         self.conn = HTTPSConnection(self.host, self.port,
                 timeout=ARGS.BATCH_SIZE*ARGS.BATCHES/2)
-        self.ids = list(TestClient.ids)
-        print(self.ids[0])
+        self.ids = list(ids)
         if ARGS.v>1:
             #self.conn.set_debuglevel(1)
             HTTPConnection.debuglevel=1
@@ -61,7 +61,7 @@ class TestClient(multiprocessing.Process):
             {"Content-type":"application/json"})
         response = self.parse_response()
         self.token = response['token']
-        logging.info("TOKEN: %s" % (self.token))
+        logging.info("TOKEN: %s...%s" % (self.token[:16], self.token[-16:]))
         return True
 
     def ping(self, is_print):
@@ -126,7 +126,7 @@ class TestClient(multiprocessing.Process):
         global ARGS
         if ARGS.ACTION == "ping":
             while not self.IS_EXIT.value:
-                if self.ping(ARGS.REPORT>0 and self.counter.value%ARGS.REPORT==0):
+                if self.ping(ARGS.report>0 and self.counter.value%ARGS.report==0):
                     self.counter.value += 1
             self.close()
             return
@@ -135,7 +135,7 @@ class TestClient(multiprocessing.Process):
             return
         if ARGS.ACTION == "benchmark":
             while not self.IS_EXIT.value:
-                if self.benchmark(ARGS.REPORT>0 and self.counter.value%ARGS.REPORT==0):
+                if self.benchmark(ARGS.report>0 and self.counter.value%ARGS.report==0):
                     self.counter.value += 1
             self.close()
             return
@@ -146,17 +146,10 @@ class TestClient(multiprocessing.Process):
                     return
                 logging.debug(id)
                 if self.doc_query(id, 
-                        ARGS.REPORT>0 and self.counter.value%ARGS.REPORT==0):
+                        ARGS.report>0 and self.counter.value%ARGS.report==0):
                     self.counter.value += 1
 
-def get_merchantids(host, port, database, username, password):
-    import os
-    filename = "/TEST/data/key/u1000000d1.shuf"
-    if os.access(filename, os.R_OK):
-        with open(filename) as f:
-            ids = [line.rstrip() for line in f]
-            return ids
-
+def get_merchantids_from_db(host, port, database, username, password):
     from pymongo import MongoClient
     logging.info("Connect to mongo://{3}:{4}@{0}:{1}/{2} for merchantid.".format(
                 host,port,database,username,password))
@@ -167,22 +160,33 @@ def get_merchantids(host, port, database, username, password):
     files = db.fs.files
     ids = {row["metadata"]["parameter"]["merchantid"]
            for row in files.find(projection={"metadata.parameter.merchantid":1,"_id":0}, limit=1000001)}
-    logging.info("Get %d merchantid." % len(ids))
-    ids = list(ids);     #logging.info("Listed.")
+    ids = list(ids);     #set -> list
+    logging.info("Get %d merchantid: [%s ... %s]" % (len(ids), ids[0], ids[-1]))
 
     mg.close()
     return ids
 
+def get_merchantids_from_file(keyfile):
+    import os
+    if os.access(keyfile, os.R_OK):
+        with open(keyfile) as f:
+            ids = [line.rstrip() for line in f]
+            return ids
+    return None
+
 ################################## MAIN ###################################
-TestClient.ids = get_merchantids('192.168.99.242', 40000, 'kydsystem', 'kyd', 'kyd')
+IDS = get_merchantids_from_file(ARGS.keyfile) 
+if IDS == None:
+    IDS = get_merchantids_from_db('192.168.99.242', 40000, 'kydsystem', 'kyd', 'kyd')
+
 IS_EXIT = multiprocessing.Value('i', 0, lock=False)
 
 counters = list(range(ARGS.THREADS))
 tc = list(range(ARGS.THREADS))
 for i in range(ARGS.THREADS):
-    random.shuffle(TestClient.ids)
+    random.shuffle(IDS)
     counters[i] = multiprocessing.Value('i', 0, lock=False)
-    tc[i] = TestClient("%s" % (i+1), "192.168.99.242", 9091, counters[i], IS_EXIT)
+    tc[i] = TestClient("%s" % (i+1), "192.168.99.242", 9091, IDS, counters[i], IS_EXIT)
     tc[i].start()
 
 last_counts = [0] * ARGS.THREADS

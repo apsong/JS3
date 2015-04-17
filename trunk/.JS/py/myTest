@@ -26,10 +26,25 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 }
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 
-for A in "query" "download"; do
-    for I in 1 2 4 6 8 10 12 16; do
-        EVAL doc.manage.py $A -t $I -b 6
-        sleep 60
+{
+    b=18
+    B=100
+    SLEEP=60
+    for I in 1 2 3 4; do
+        EVAL doc.manage.py query -t $I -b $b -B $B
+        sleep $SLEEP
+        EVAL doc.manage.py download -t $I -b $b -B $B
+        sleep $SLEEP
+        EVAL doc.manage.py query --no_verify -t $I -b $b -B $B
+        sleep $SLEEP
         echo
     done
-done 2>&1 | tee `NEWFILE $PROGRAM.log`
+
+    for I in 6 8 10 12 14 16; do
+        EVAL doc.manage.py query -t $I -b $b -B $B
+        sleep $SLEEP
+        EVAL doc.manage.py query --no_verify -t $I -b $b -B $B
+        sleep $SLEEP
+        echo
+    done
+} 2>&1 | tee `NEWFILE $PROGRAM.log`

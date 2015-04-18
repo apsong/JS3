@@ -109,6 +109,7 @@ class TestClient(multiprocessing.Process):
             if expected_pdf not in [e["filename"] for e in response]:
                 logging.error("VERIFY FAILED: id: %s => expected %s, but got %s" %
                         (merchantid, expected_pdf, json.dumps(response, indent=2)))
+                return False
         elif is_print:
             logging.info("%d: %s => %s" % (self.count, merchantid, " ".join([e['filename'] for e in response])))
         return True
@@ -166,7 +167,7 @@ def get_merchantids_from_db(host, port, database, username, password):
     db = mg["kyddata"]
     files = db.fs.files
     ids = {row["metadata"]["parameter"]["merchantid"] : row["filename"]
-        for row in files.find(projection={"metadata.parameter.merchantid":1,"filename":1,"_id":0}, limit=101)}
+        for row in files.find(projection={"metadata.parameter.merchantid":1,"filename":1,"_id":0}, limit=1000001)}
     ids = list(ids.items())
     random.shuffle(ids)
     logging.info("Get %d (merchantid,pdf): [%s ... %s]" % (len(ids), ids[0], ids[-1]))

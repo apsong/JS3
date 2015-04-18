@@ -25,11 +25,28 @@ echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Re
 touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 }
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+usage()
+{
+    echo 1>&2 "Usage: $PROGRAM -i TESTPLAN -d APACHE_DIR"
+    echo 1>&2 " $PROGRAM -i TS -d AJC121207"
+}
+
+b=18
+B=100
+SLEEP=60
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -b) shift; b="$1";;
+        -B) shift; B="$1";;
+        --sleep) shift; SLEEP="$1";;
+        --help) usage; exit 0;;
+        *) echo 1>&2 "($PROGRAM)Error: Invalid option '$1'"; usage; exit 1;;
+    esac
+shift
+done
 
 {
-    b=18
-    B=100
-    SLEEP=60
     for I in 1 2 3 4; do
         EVAL doc.manage.py query -t $I -b $b -B $B
         sleep $SLEEP

@@ -237,6 +237,10 @@ elif ARGS.ACTION == "download":
     cmd = "doc.query&download"
 else:
     cmd = "doc.query"
-logging.info("%d thread(s): %.1f %s/second  <= (%s)/%d/%d" % 
-        (ARGS.THREADS, sum(report_list)/len(report_list)/ARGS.BATCH_SECONDS, cmd,
+if ARGS.THREADS==1:
+    threads = "thread"
+else:
+    threads = "threads"
+logging.info("%d %s: %.1f %s/second  <= (%s)/%d/%d" % 
+        (ARGS.THREADS, threads, sum(report_list)/len(report_list)/ARGS.BATCH_SECONDS, cmd,
          "+".join(map(str, report_list)), len(report_list), ARGS.BATCH_SECONDS))

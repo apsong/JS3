@@ -27,8 +27,8 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 usage()
 {
-    echo 1>&2 "Usage: $PROGRAM -i TESTPLAN -d APACHE_DIR"
-    echo 1>&2 " $PROGRAM -i TS -d AJC121207"
+    echo 1>&2 "Usage: $PROGRAM [-b batch_num] [-B batch_seconds] [--sleep seconds]"
+    echo 1>&2 "    (default) [-b 6]         [-B 100]           [--sleep 60]"
 }
 
 b=18
@@ -47,6 +47,8 @@ shift
 done
 
 {
+    EVAL rm -f id_pdf.tuple
+
     for I in 1 2 3 4; do
         EVAL doc.manage.py query -t $I -b $b -B $B
         sleep $SLEEP

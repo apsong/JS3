@@ -44,3 +44,4 @@ export PATH="$_PATH"
 
 unset TZ
 ulimit -c unlimited
+ulimit -u 10240

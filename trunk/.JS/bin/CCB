@@ -1,0 +1,153 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
+EVAL()
+{
+    echo "#!CMD:[" $@ "]" | awk '{printf "%.256s\n", $0}'
+    eval "$@"
+}
+
+NEWFILE()
+{
+    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
+
+    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
+
+    mkdir -p .$FILE || exit 101
+    if [ -h $FILE ]; then
+rm -f $FILE
+    elif [ -e $FILE ]; then
+echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
+        mv $FILE $REAL_FILE.bak
+    fi
+touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
+}
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+
+DIR=$PWD
+while [ "$DIR" != "/" ]; do
+    [ -f $DIR/service.sh ] && break || DIR=`dirname $DIR`
+done
+[ ! -f $DIR/service.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
+DIR=`echo $DIR | sed -e 's/-solo//g'`
+MODULES=$DIR/modules
+SOLO_MODULES=$DIR-solo/modules
+#SERVICE=$DIR/service.sh
+#DS_CFG=$MODULES/DocumentService/config/server.cfg
+#JS_CFG=$MODULES/JobScheduler/config/server.cfg
+#JS_JOB=$MODULES/JobScheduler/config/job.xml
+#DS_SH=$MODULES/DocumentService/bin/startServer.sh
+#SE_SH=$MODULES/SearchEngine/bin/startServer.sh
+
+case $PROGRAM in
+    hadoop.stop)
+        EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh stop -all && cd -"
+        ;;
+    hadoop.start)
+        EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh start -all && cd -"
+        echo
+        EVAL "jps | grep -E 'Node|Manager'"
+        ;;
+    hadoop.restart)
+        hadoop.stop
+        echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/* ]"
+        rm -f $MODULES/hadoop/hadoop-*/logs/*
+        hadoop.start
+        ;;
+
+    hadoop.jobhistory.stop)
+        EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh stop -jobhistory && cd -"
+        ;;
+    hadoop.jobhistory.start)
+        EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh start -jobhistory && cd -"
+        echo
+        EVAL "jps | grep JobHistoryServer"
+        ;;
+    hadoop.jobhistory.restart)
+        hadoop.jobhistory.stop
+        hadoop.jobhistory.start
+        ;;
+
+    hive.stop)
+        EVAL "cd $MODULES/hive/ && ./stopServer.sh all && cd -"
+        ;;
+    hive.start)
+        EVAL "cd $MODULES/hive/ && ./startServer.sh all && cd -"
+        echo
+        EVAL "ps -o 'pid,args' | grep [R]unJar | sed -e 's/-D[^ ]* //g' -e 's@/[^ ]*/@@g'"
+        ;;
+    hive.restart)
+        hive.stop
+        echo "#!CMD:[ rm -f $MODULES/hive/logs/* ]"
+        rm -f $MODULES/hive/logs/*
+        hive.start
+        ;;
+
+    mysql4ccb.stop)
+        EVAL "cd $MODULES/mysql/ && ./stopServer.sh && cd -"
+        ;;
+    mysql4ccb.start)
+        EVAL "cd $MODULES/mysql/ && ./startServer.sh && cd -"
+        echo
+        sleep 1
+        echo
+        EVAL "ps -o 'pid,args' | grep [m]ysqld"
+        ;;
+    mysql4ccb.restart)
+        mysql4ccb.stop
+        echo "#!CMD:[ rm -f $MODULES/mysql/logs/* ]"
+        rm -f $MODULES/mysql/logs/*
+        mysql4ccb.start
+        ;;
+
+    azkaban.stop)
+        EVAL "cd $SOLO_MODULES/AzkabanSoloServer/ && ./stopServer.sh all && cd -"
+        jps | awk '/AzkabanSingleServer/{system("kill " $1);}'
+        ;;
+    azkaban.start)
+        EVAL "cd $SOLO_MODULES/AzkabanSoloServer/ && ./startServer.sh all && cd -"
+        echo
+        EVAL "jps | grep Azkaban"
+        ;;
+    azkaban.restart)
+        azkaban.stop
+        sleep 1
+        echo "#!CMD:[ rm -f $SOLO_MODULES/AzkabanSoloServer/{core.*, logs/*} ]"
+        rm -f $SOLO_MODULES/AzkabanSoloServer/{core.*, logs/*}
+        azkaban.start
+        ;;
+
+    sqoop.stop)
+        EVAL "cd $SOLO_MODULES/sqoop/ && ./stopNode.sh && cd -"
+        ;;
+    sqoop.start)
+        EVAL "cd $SOLO_MODULES/sqoop/ && ./startNode.sh && cd -"
+        echo
+        EVAL "jps | grep Bootstrap"
+        ;;
+    sqoop.restart)
+        sqoop.stop
+        sqoop.start
+        ;;
+
+    tair.stop)
+        EVAL "cd $SOLO_MODULES/tair/ && ./stopServer.sh -all && cd -"
+        sleep 5
+        echo
+        EVAL "ps -o 'pid,args' | grep '/sbin/[t]air'"
+        ;;
+    tair.start)
+        EVAL "cd $SOLO_MODULES/tair/ && ./startServer.sh -all && cd -"
+        echo
+        EVAL "ps -o 'pid,args' | grep '/sbin/[t]air'"
+        ;;
+    tair.restart)
+        tair.stop
+        echo
+        tair.start
+        ;;
+
+esac
+

@@ -76,7 +76,7 @@ case $PROGRAM in
     hive.start)
         EVAL "cd $MODULES/hive/ && ./startServer.sh all && cd -"
         echo
-        EVAL "ps -o 'pid,args' | grep [R]unJar | sed -e 's/-D[^ ]* //g' -e 's@/[^ ]*/@@g'"
+        EVAL "ps -eo 'pid,args' | grep [R]unJar | sed -e 's/-[DX][^ ]* //g' -e 's@/[^ ]*/@@g'"
         ;;
     hive.restart)
         hive.stop
@@ -93,7 +93,7 @@ case $PROGRAM in
         echo
         sleep 1
         echo
-        EVAL "ps -o 'pid,args' | grep [m]ysqld"
+        EVAL "ps -eo 'pid,args' | grep [m]ysqld | sed -e 's/--[^ ]* //g'"
         ;;
     mysql4ccb.restart)
         mysql4ccb.stop
@@ -136,17 +136,37 @@ case $PROGRAM in
         EVAL "cd $SOLO_MODULES/tair/ && ./stopServer.sh -all && cd -"
         sleep 5
         echo
-        EVAL "ps -o 'pid,args' | grep '/sbin/[t]air'"
+        EVAL "ps -eo 'pid,args' | grep '/sbin/[t]air'"
         ;;
     tair.start)
         EVAL "cd $SOLO_MODULES/tair/ && ./startServer.sh -all && cd -"
         echo
-        EVAL "ps -o 'pid,args' | grep '/sbin/[t]air'"
+        EVAL "ps -eo 'pid,args' | grep '/sbin/[t]air'"
         ;;
     tair.restart)
         tair.stop
         echo
         tair.start
+        ;;
+
+    ccb.status)
+        echo "=== MySQL ==="
+        ps -eo 'pid,args' | grep [m]ysqld | sed -e 's/--[^ ]* //g'
+        echo
+        echo "=== DataNode NameNode NodeManager ResourceManager & JobHistoryServer ==="
+        jps | grep -E 'Node|Manager|JobHistory' | sort -n
+        echo
+        echo "=== HWIServer HiveServer2 ==="
+        ps -eo 'pid,args' | grep [R]unJar | sed -e 's/-[DX][^ ]* //g' -e 's@/[^ ]*/@@g'
+        echo
+        echo "=== tair_cfg_svr tair_server ==="
+        ps -eo 'pid,args' | grep '/sbin/[t]air'
+        echo
+        echo "=== sqoop:BootStrap ==="
+        jps | grep Bootstrap
+        echo
+        echo "=== AzkabanSingleServer ==="
+        jps | grep Azkaban
         ;;
 
 esac

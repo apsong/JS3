@@ -28,22 +28,19 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 
 usage()
 {
-    echo 1>&2 "Usage: $PROGRAM nmb|ccb|ccb-solo [--check]"
+    echo 1>&2 "Usage: $PROGRAM nmb|ccb|ccb-base [--check]"
 }
 while [ $# -gt 0 ]; do
     case $1 in
         nmb)
             BUILD_BASE=/mnt/81-build/nmb-server/rollingbuild
             LOCAL_BASE=TEST
+            TYPE=$1
             ;;
-        ccb)
+        ccb*)
             BUILD_BASE=/mnt/81-build/DataPentamix/ccb
             LOCAL_BASE=CCB
-            ;;
-        ccb-solo)
-            BUILD_BASE=/mnt/81-build/DataPentamix/ccb
-            LOCAL_BASE=CCB
-            IS_SOLO=1
+            TYPE=$1
             ;;
         --check)
             EVAL find $BUILD_BASE/*-*/
@@ -62,18 +59,20 @@ done
 [ -z "$BUILD_BASE" ] && { usage; exit 2;}
 
 BUILD_DATE=`ls $BUILD_BASE/ | grep '[0-9]-[0-9]' | tail -1`
-[ -n "$IS_SOLO" ] &&  NEW_BUILD=$BUILD_DATE-solo || NEW_BUILD=$BUILD_DATE
-mkdir -v "$NEW_BUILD" || exit 1
+[ "$TYPE" = "ccb-base" ] && NEW_BUILD=.$BUILD_DATE || NEW_BUILD=$BUILD_DATE
 
-if [ -n "$IS_SOLO" ]; then
+DIR=/$LOCAL_BASE/$NEW_BUILD
+mkdir -v "$DIR" || exit 1
+
+if [ "$TYPE" = "ccb" ]; then
     TGZS=`ls $BUILD_BASE/$BUILD_DATE/*-solo-redhat*.tar.gz` || exit 3
 else
     TGZS=`ls $BUILD_BASE/$BUILD_DATE/*[0-9]-redhat*.tar.gz` || exit 3
 fi
 for TGZ in $TGZS; do
-    DIR=~/$LOCAL_BASE/$NEW_BUILD
     #LOCAL_TGZ=~/$LOCAL_BASE/`basename $TGZ`
     #cp -v $TGZ $LOCAL_TGZ
     #TGZ=$LOCAL_TGZ
     EVAL "mkdir -p $DIR && cd $DIR && tar xzvf $TGZ" || exit 4
 done
+[ "$TYPE" = "ccb-base" ] && { ln -sv $DIR /$LOCAL_BASE/BASE; cp -v /$LOCAL_BASE/fonts/* /$LOCAL_BASE/BASE/fonts;}

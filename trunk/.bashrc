@@ -2,6 +2,7 @@
 source $HOME/.bash_functions
 [ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_ds_functions #######"
 source $HOME/.bash_ds_functions
+source $HOME/.bash_ccb_functions
 
 export PS1="[\u@\h]\w> "
 export JAVA_HOME=/opt/jdk

@@ -1,0 +1,44 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
+EVAL()
+{
+    echo "#!CMD:[" $@ "]"
+    eval "$@"
+}
+
+NEWFILE()
+{
+    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
+
+    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
+
+    mkdir -p .$FILE || exit 101
+    if [ -h $FILE ]; then
+rm -f $FILE
+    elif [ -e $FILE ]; then
+echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
+        mv $FILE $REAL_FILE.bak
+    fi
+touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
+}
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+
+for F in `ls *-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].csv`; do
+    DIR=`echo $F | sed -e 's/.\{6\}$//'`
+    echo $DIR
+    mkdir -pv $DIR
+    mv -v $F $DIR
+done
+
+SRC=`ls -d TradFlows-* | awk -F- '{print $2}'`
+DST=201503
+[ "$SRC" = "$DST" ] && exit 0
+for FILE in `find -depth -name "*$SRC*"`; do
+    NEW_FILE=`echo $FILE | sed -e "s/$SRC/$DST/g"`
+    NEW_FILE=`dirname $FILE`/`basename $NEW_FILE`
+    mv -v $FILE $NEW_FILE
+    [ -f $NEW_FILE ] && sed -i -e "s/$SRC/$DST/g" $NEW_FILE
+done

@@ -31,9 +31,20 @@ while [ "$DIR" != "/" ]; do
     [ -f $DIR/service.sh ] && break || DIR=`dirname $DIR`
 done
 [ ! -f $DIR/service.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
-DIR=`echo $DIR | sed -e 's/-solo//g'`
-MODULES=$DIR/modules
-SOLO_MODULES=$DIR-solo/modules
+
+case `basename $DIR` in
+    BASE)
+        DIR_BASE=$DIR
+        DIR_SOLO=`find -L \`dirname $DIR\` -name "[0-9]*[0-9]-*" | sort | tail -1`
+        ;;
+    [0-9]*[0-9]-*)
+        DIR_BASE=`dirname $DIR`/BASE
+        DIR_SOLO=$DIR
+        ;;
+esac
+
+MODULES=$DIR_BASE/modules
+SOLO_MODULES=$DIR_SOLO/modules
 #SERVICE=$DIR/service.sh
 #DS_CFG=$MODULES/DocumentService/config/server.cfg
 #JS_CFG=$MODULES/JobScheduler/config/server.cfg
@@ -41,20 +52,51 @@ SOLO_MODULES=$DIR-solo/modules
 #DS_SH=$MODULES/DocumentService/bin/startServer.sh
 #SE_SH=$MODULES/SearchEngine/bin/startServer.sh
 
+LANG=zh_CN.UTF-8
+LC_ALL=zh_CN.UTF-8
+export LANG LC_ALL
+
+namenode_safe_mode_off()
+{
+    LOG=$MODULES/hadoop/hadoop-*/logs/*namenode*.log
+    for i in `seq 12`; do
+        EVAL "sleep 5; # for leaving Safe mode"
+        if [ `grep -c "Safe mode is OFF" $LOG` -ge 1 ]; then
+            return 0
+        fi
+    done
+    return 1
+}
 case $PROGRAM in
-    hadoop.stop)
+    hadoop.hdfs.stop)
         EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh stop -all && cd -"
         ;;
-    hadoop.start)
+    hadoop.hdfs.start)
         EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh start -all && cd -"
+        namenode_safe_mode_off || echo 1>& "Error: namenode doesn't leave Safe mode after 60 seconds..."
         echo
-        EVAL "jps | grep -E 'Node|Manager'"
+        EVAL "jps | grep -E 'Node\>'"
         ;;
-    hadoop.restart)
-        hadoop.stop
-        echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/* ]"
-        rm -f $MODULES/hadoop/hadoop-*/logs/*
-        hadoop.start
+    hadoop.hdfs.restart)
+        hadoop.hdfs.stop
+        echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/hadoop* ]"
+        rm -f $MODULES/hadoop/hadoop-*/logs/hadoop*
+        hadoop.hdfs.start
+        ;;
+
+    hadoop.yarn.stop)
+        EVAL "cd $MODULES/hadoop/ && ./yarn_daemon.sh stop -all && cd -"
+        ;;
+    hadoop.yarn.start)
+        EVAL "cd $MODULES/hadoop/ && ./yarn_daemon.sh start -all && cd -"
+        echo
+        EVAL "jps | grep -E 'Manager'"
+        ;;
+    hadoop.yarn.restart)
+        hadoop.yarn.stop
+        echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/yarn* ]"
+        rm -f $MODULES/hadoop/hadoop-*/logs/yarn*
+        hadoop.yarn.start
         ;;
 
     hadoop.jobhistory.stop)
@@ -63,11 +105,33 @@ case $PROGRAM in
     hadoop.jobhistory.start)
         EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh start -jobhistory && cd -"
         echo
-        EVAL "jps | grep JobHistoryServer"
+        EVAL "jps | grep -E 'JobHistoryServer'"
         ;;
     hadoop.jobhistory.restart)
         hadoop.jobhistory.stop
+        echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/*history* ]"
+        rm -f $MODULES/hadoop/hadoop-*/logs/*history*
         hadoop.jobhistory.start
+        ;;
+
+    hadoop.stop)
+        EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh stop -jobhistory && cd -"
+        EVAL "cd $MODULES/hadoop/ && ./yarn_daemon.sh stop -all && cd -"
+        EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh stop -all && cd -"
+        ;;
+    hadoop.start)
+        EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh start -all && cd -"
+        namenode_safe_mode_off || echo 1>& "Error: namenode doesn't leave Safe mode after 60 seconds..."
+        EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh start -jobhistory && cd -"
+        EVAL "cd $MODULES/hadoop/ && ./yarn_daemon.sh start -all && cd -"
+        echo
+        EVAL "jps | grep -E 'Node|Manager|JobHistoryServer'"
+        ;;
+    hadoop.restart)
+        hadoop.stop
+        echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/* ]"
+        rm -f $MODULES/hadoop/hadoop-*/logs/*
+        hadoop.start
         ;;
 
     hive.stop)
@@ -129,6 +193,7 @@ case $PROGRAM in
         ;;
     sqoop.restart)
         sqoop.stop
+        sleep 3
         sqoop.start
         ;;
 
@@ -145,6 +210,8 @@ case $PROGRAM in
         ;;
     tair.restart)
         tair.stop
+        echo "#!CMD:[ rm -f $SOLO_MODULES/tair/tair-*/* ]"
+        rm -f $SOLO_MODULES/tair/tair-*/logs/*
         echo
         tair.start
         ;;
@@ -167,6 +234,17 @@ case $PROGRAM in
         echo
         echo "=== AzkabanSingleServer ==="
         jps | grep Azkaban
+        ;;
+
+    ccb.preInstall)
+        cd $DIR_SOLO/hadoop_conf
+        cp -v $MODULES/hadoop/hadoop-*/etc/hadoop/*-site.xml .
+        cat > hive-client.conf << EOF
+hive.cluster.mode=N
+hiveserver2.user=sjin
+hiveserver2.url=192.168.99.242:10000
+EOF
+        EVAL cat hive-client.conf
         ;;
 
 esac

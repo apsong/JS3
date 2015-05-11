@@ -1,0 +1,59 @@
+EVAL()
+{
+    echo "#!CMD:[" $@ "]"
+    eval "$@"
+}
+
+.ccb.base()
+{
+    while [ "$PWD" != "/" ]; do
+        if [ -f service.sh ]; then
+            return 0
+        else
+            cd ..
+        fi
+    done
+    echo 1>&2 "Error: Incorrect work dir."
+    return 1
+}
+
+CCB_BASE=/CCB/BASE
+CCB_SOLO=`find -L /CCB -maxdepth 1 -name "[0-9]*[0-9]-*" | sort | tail -1`
+
+.ccb.hive()
+{
+    cd $CCB_BASE/modules/hive
+}
+.ccb.hadoop()
+{
+    cd $CCB_BASE/modules/hadoop
+}
+.ccb.mysql()
+{
+    cd $CCB_BASE/modules/mysql
+}
+
+.ccb.azkaban()
+{
+    cd $CCB_SOLO/modules/AzkabanSoloServer/azkaban-*
+}
+.ccb.hadoop.solo()
+{
+    cd $CCB_SOLO/modules/hadoop/hadoop-*
+}
+.ccb.tair()
+{
+    cd $CCB_SOLO/modules/tair/tair-*
+
+    EVAL ./stat.sh -c localhost:5198 -g datapentamix
+}
+.ccb.tairclient()
+{
+    cd $CCB_SOLO/modules/tair/tair-*
+
+    EVAL sbin/tairclient -c localhost:5198 -g datapentamix
+}
+.ccb.sqoop()
+{
+    cd $CCB_SOLO/modules/sqoop
+}

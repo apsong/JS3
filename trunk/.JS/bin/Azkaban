@@ -66,13 +66,25 @@ getSessionID()
     echo "session_id=$session_id" > $ID_FILE
     return 0
 }
-### MAIN #######################################################################
+### Pre Main ###################################################################
 case "$PROGRAM" in
     Azkaban) CMD=$1; shift;;
     Azkaban.*) CMD=`echo $PROGRAM | sed -e 's/Azkaban\.//'`;;
     *) logERROR "Invalid PROGRAM '$PROGRAM'"; exit 1;;
 esac
 
+case "$CMD" in
+    --help) CMD=""; usage; exit 0;;
+    --mklinks)
+        cd `dirname $0`
+        for CMD in project.{create,delete,list,upload,Flows} \
+                   flow.{execute,Jobs,Executions,Running} \
+                   exec.{cancel,pause,resume,Status,Logs,Updates}; do
+            ln -sfv Azkaban Azkaban.$CMD
+        done; exit 0;;
+esac
+
+### Main #######################################################################
 # Input arguments
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -180,13 +192,5 @@ case "$CMD" in
             "$URL/executor"
         echo
         ;;
-    --help) CMD=""; usage; exit 0;;
-    --mklinks)
-        cd `dirname $0`
-        for CMD in project.{create,delete,list,upload,Flows} \
-                   flow.{execute,Jobs,Executions,Running} \
-                   exec.{cancel,pause,resume,Status,Logs,Updates}; do
-            ln -sfv Azkaban Azkaban.$CMD
-        done; exit 0;;
     *) logERROR "Invalid sub command '$CMD'"; CMD=""; usage; exit 1;;
 esac

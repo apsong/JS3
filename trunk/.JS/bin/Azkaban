@@ -2,6 +2,7 @@
 
 PROGRAM=`basename $0`
 
+################################################################################
 #0:DEBUG  1:INFO  2:WARN  3:ERROR
 logLEVEL=2
 logINFO()
@@ -17,27 +18,40 @@ usage()
 {
     echo 1>&2 "Usage:"
     {
-        echo "    Azkaban.project.create [URL] -p PROJECT [-d DESCRIPTION]"
-        echo "    Azkaban.project.delete [URL] -p PROJECT"
-        echo "    Azkaban.project.list   [URL]"
-        echo "    Azkaban.project.upload [URL] -p PROJECT -z ZIP"
-        echo "    Azkaban.project.Flows  [URL] -p PROJECT"
-        echo "    Azkaban.flow.execute    [URL] -p PROJECT -f FLOW"
-        echo "    Azkaban.flow.Jobs       [URL] -p PROJECT -f FLOW"
-        echo "    Azkaban.flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH]"
-        echo "    Azkaban.flow.Running    [URL] -p PROJECT -f FLOW"
-        echo "    Azkaban.exec.cancel  [URL] -e EXECID"
-        echo "    Azkaban.exec.pause   [URL] -e EXECID"
-        echo "    Azkaban.exec.resume  [URL] -e EXECID"
-        echo "    Azkaban.exec.Status  [URL] -e EXECID"
-        echo "    Azkaban.exec.Logs    [URL] -e EXECID -j JOBID -o OFFSET -l LENGTH"
-        echo "    Azkaban.exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
+        echo "    Azkaban project.create [URL] -p PROJECT [-d DESCRIPTION]"
+        echo "    Azkaban project.delete [URL] -p PROJECT"
+        echo "    Azkaban project.list   [URL]"
+        echo "    Azkaban project.upload [URL] -p PROJECT -z ZIP"
+        echo "    Azkaban project.Flows  [URL] -p PROJECT"
+        echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW"
+        echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW"
+        echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH]"
+        echo "    Azkaban flow.Running    [URL] -p PROJECT -f FLOW"
+        echo "    Azkaban exec.cancel  [URL] -e EXECID"
+        echo "    Azkaban exec.pause   [URL] -e EXECID"
+        echo "    Azkaban exec.resume  [URL] -e EXECID"
+        echo "    Azkaban exec.Status  [URL] -e EXECID"
+        echo "    Azkaban exec.Logs    [URL] -e EXECID -j JOBID -o OFFSET -l LENGTH"
+        echo "    Azkaban exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
     } | grep "$PROGRAM" 1>&2
     echo 1>&2 ""
     echo 1>&2 "Note:"
     echo 1>&2 '    URL: default to $AZKABAN_URL, or "http://localhost:8081"'
 }
-
+################################################################################
+if [ "$PROGRAM" == "Azkaban" ]; then
+    case "$1" in
+        *.*) PROGRAM=$PROGRAM.$1; shift; exec $PROGRAM "$@"; exit $?;;
+        --mklinks)
+            cd `dirname $0`
+            for CMD in project.{create,delete,list,upload,Flows}; do
+                ln -sfv Azkaban Azkaban.$CMD
+            done; exit 0;;
+        --help) usage; exit 0;;
+        *)      usage; exit 1;;
+    esac
+fi
+################################################################################
 getSessionID()
 {
     ID_FILE=.session_id.`echo $URL | sed -e 's@/@@g'`
@@ -65,6 +79,7 @@ getSessionID()
     echo "session_id=$session_id" > $ID_FILE
     return 0
 }
+### MAIN #######################################################################
 
 # Input arguments
 while [ $# -gt 0 ]; do
@@ -175,3 +190,5 @@ case "$PROGRAM" in
         ;;
     *) echo 1>&2 "($PROGRAM)Error: Invalid command '$PROGRAM'"; exit 1;;
 esac
+sleep 30
+echo END

@@ -31,7 +31,7 @@ usage()
         echo "    Azkaban exec.pause   [URL] -e EXECID"
         echo "    Azkaban exec.resume  [URL] -e EXECID"
         echo "    Azkaban exec.Status  [URL] -e EXECID"
-        echo "    Azkaban exec.Logs    [URL] -e EXECID -j JOBID -o OFFSET -l LENGTH"
+        echo "    Azkaban exec.Logs    [URL] -e EXECID -j JOB [-s START] [-l LENGTH]"
         echo "    Azkaban exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
     } | grep "$CMD" 1>&2
     echo 1>&2 ""
@@ -94,8 +94,12 @@ while [ $# -gt 0 ]; do
         -z) shift; ZIP=$1;;
         -f) shift; FLOW=$1;;
         -e) shift; EXECID=$1;;
+        -j) shift; JOB=$1;;
+        -s) shift; START=$1;;
+        -l) shift; LENGTH=$1;;
+        -t) shift; LAST_UPDATE_TIME=$1;;
         --help) usage; exit 0;;
-        *) echo 1>&2 "($PROGRAM)Error: Invalid parameter '$1'"; usage; exit 1;;
+        *) logERROR "Invalid parameter '$1'"; usage; exit 1;;
     esac
 shift
 done
@@ -111,17 +115,16 @@ case "$CMD" in
         [ -z "$DESCRIPTION" ] && DESCRIPTION=.
         curl -k -X POST -d "session.id=$SESSION_ID&name=$PROJECT&description=$DESCRIPTION" \
             "$URL/manager?action=create"
-        echo
-        ;;
+        echo ;;
     project.delete)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&delete=true&project=$PROJECT" \
-            "$URL/manager"
+        curl -k -d "session.id=$SESSION_ID&project=$PROJECT" \
+            "$URL/manager?delete=true"
         ;;
     project.list)
-        curl -k# --get -d "session.id=$SESSION_ID" "$URL/index" 2>&1 \
+        curl -k# -d "session.id=$SESSION_ID" "$URL/index" 2>&1 \
             | awk '/project=|project-last-modified/{print gensub("<[^>]*>", "", "g")}' \
-            | awk '{name=$1; getline; printf("%-20s %s %s\n", name, $4, $5)}'
+            | awk '{name=$1; getline; printf("%-20s %s %s\n", name, $4, $5)}' | sort -b -k 2
         ;;
     project.upload)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
@@ -130,67 +133,71 @@ case "$CMD" in
             --form "session.id=$SESSION_ID" --form "ajax=upload" \
             --form "project=$PROJECT;type=plain" --form "file=@$ZIP;type=application/zip" \
             "$URL/manager"
-        echo
-        ;;
+        echo ;;
     project.Flows)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=fetchprojectflows&project=$PROJECT" \
-            "$URL/manager"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&project=$PROJECT" \
+            "$URL/manager?ajax=fetchprojectflows"
+        echo ;;
     flow.Jobs)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=fetchflowgraph&project=$PROJECT&flow=$FLOW" \
-            "$URL/manager"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+            "$URL/manager?ajax=fetchflowgraph"
+        echo ;;
     flow.Executions)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         [ -z "$START" ] && START=0
         [ -z "$LENGTH" ] && LENGTH=-1
-        curl -k --get -d "session.id=$SESSION_ID&ajax=fetchFlowExecutions&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
-            "$URL/manager"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
+            "$URL/manager?ajax=fetchFlowExecutions"
+        echo ;;
     flow.Running)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=getRunning&project=$PROJECT&flow=$FLOW" \
-            "$URL/executor"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+            "$URL/executor?ajax=getRunning"
+        echo ;;
     flow.execute)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=executeFlow&project=$PROJECT&flow=$FLOW" \
-            "$URL/executor"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+            "$URL/executor?ajax=executeFlow"
+        echo ;;
     exec.cancel)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=cancelFlow&execid=$EXECID" \
-            "$URL/executor"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&execid=$EXECID" \
+            "$URL/executor?ajax=cancelFlow"
+        echo ;;
     exec.pause)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=pauseFlow&execid=$EXECID" \
-            "$URL/executor"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&execid=$EXECID" \
+            "$URL/executor?ajax=pauseFlow"
+        echo ;;
     exec.resume)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=resumeFlow&execid=$EXECID" \
-            "$URL/executor"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&execid=$EXECID" \
+            "$URL/executor?ajax=resumeFlow"
+        echo ;;
     exec.Status)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k --get -d "session.id=$SESSION_ID&ajax=fetchexecflow&execid=$EXECID" \
-            "$URL/executor"
-        echo
-        ;;
+        curl -k -d "session.id=$SESSION_ID&execid=$EXECID" \
+            "$URL/executor?ajax=fetchexecflow"
+        echo ;;
+    exec.Logs)
+        [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
+        [ -z "$JOB" ] && { logERROR "JOB must be set"; usage; exit 2;}
+        [ -z "$START" ] && START=0
+        [ -z "$LENGTH" ] && LENGTH=99999999
+        curl -k -d "session.id=$SESSION_ID&execid=$EXECID&jobId=$JOB&offset=$START&length=$LENGTH" \
+            "$URL/executor?ajax=fetchExecJobLogs"
+        echo ;;
+    exec.Updates)
+        [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
+        [ -z "$LAST_UPDATE_TIME" ] && LAST_UPDATE_TIME=-1
+        curl -k -d "session.id=$SESSION_ID&execid=$EXECID&lastUpdateTime=$LAST_UPDATE_TIME" \
+            "$URL/executor?ajax=fetchexecflowupdate"
+        echo ;;
     *) logERROR "Invalid sub command '$CMD'"; CMD=""; usage; exit 1;;
 esac

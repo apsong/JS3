@@ -33,24 +33,11 @@ usage()
         echo "    Azkaban exec.Status  [URL] -e EXECID"
         echo "    Azkaban exec.Logs    [URL] -e EXECID -j JOBID -o OFFSET -l LENGTH"
         echo "    Azkaban exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
-    } | grep "$PROGRAM" 1>&2
+    } | grep "$CMD" 1>&2
     echo 1>&2 ""
     echo 1>&2 "Note:"
     echo 1>&2 '    URL: default to $AZKABAN_URL, or "http://localhost:8081"'
 }
-################################################################################
-if [ "$PROGRAM" == "Azkaban" ]; then
-    case "$1" in
-        *.*) PROGRAM=$PROGRAM.$1; shift; exec $PROGRAM "$@"; exit $?;;
-        --mklinks)
-            cd `dirname $0`
-            for CMD in project.{create,delete,list,upload,Flows}; do
-                ln -sfv Azkaban Azkaban.$CMD
-            done; exit 0;;
-        --help) usage; exit 0;;
-        *)      usage; exit 1;;
-    esac
-fi
 ################################################################################
 getSessionID()
 {
@@ -80,6 +67,11 @@ getSessionID()
     return 0
 }
 ### MAIN #######################################################################
+case "$PROGRAM" in
+    Azkaban) CMD=$1; shift;;
+    Azkaban.*) CMD=`echo $PROGRAM | sed -e 's/Azkaban\.//'`;;
+    *) logERROR "Invalid PROGRAM '$PROGRAM'"; exit 1;;
+esac
 
 # Input arguments
 while [ $# -gt 0 ]; do
@@ -101,25 +93,25 @@ done
 logINFO "URL=$URL"
 SESSION_ID=`getSessionID` || exit 2
 
-case "$PROGRAM" in
-    Azkaban.project.create)
+case "$CMD" in
+    project.create)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$DESCRIPTION" ] && DESCRIPTION=.
         curl -k -X POST -d "session.id=$SESSION_ID&name=$PROJECT&description=$DESCRIPTION" \
             "$URL/manager?action=create"
         echo
         ;;
-    Azkaban.project.delete)
+    project.delete)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&delete=true&project=$PROJECT" \
             "$URL/manager"
         ;;
-    Azkaban.project.list)
+    project.list)
         curl -k# --get -d "session.id=$SESSION_ID" "$URL/index" 2>&1 \
             | awk '/project=|project-last-modified/{print gensub("<[^>]*>", "", "g")}' \
             | awk '{name=$1; getline; printf("%-20s %s %s\n", name, $4, $5)}'
         ;;
-    Azkaban.project.upload)
+    project.upload)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$ZIP" ] && { logERROR "ZIP must be set"; usage; exit 2;}
         curl -k -i -H "Content-Type: multipart/mixed" -X POST \
@@ -128,20 +120,20 @@ case "$PROGRAM" in
             "$URL/manager"
         echo
         ;;
-    Azkaban.project.Flows)
+    project.Flows)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=fetchprojectflows&project=$PROJECT" \
             "$URL/manager"
         echo
         ;;
-    Azkaban.flow.Jobs)
+    flow.Jobs)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=fetchflowgraph&project=$PROJECT&flow=$FLOW" \
             "$URL/manager"
         echo
         ;;
-    Azkaban.flow.Executions)
+    flow.Executions)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         [ -z "$START" ] && START=0
@@ -150,45 +142,51 @@ case "$PROGRAM" in
             "$URL/manager"
         echo
         ;;
-    Azkaban.flow.Running)
+    flow.Running)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=getRunning&project=$PROJECT&flow=$FLOW" \
             "$URL/executor"
         echo
         ;;
-    Azkaban.flow.execute)
+    flow.execute)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=executeFlow&project=$PROJECT&flow=$FLOW" \
             "$URL/executor"
         echo
         ;;
-    Azkaban.exec.cancel)
+    exec.cancel)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=cancelFlow&execid=$EXECID" \
             "$URL/executor"
         echo
         ;;
-    Azkaban.exec.pause)
+    exec.pause)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=pauseFlow&execid=$EXECID" \
             "$URL/executor"
         echo
         ;;
-    Azkaban.exec.resume)
+    exec.resume)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=resumeFlow&execid=$EXECID" \
             "$URL/executor"
         echo
         ;;
-    Azkaban.exec.Status)
+    exec.Status)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         curl -k --get -d "session.id=$SESSION_ID&ajax=fetchexecflow&execid=$EXECID" \
             "$URL/executor"
         echo
         ;;
-    *) echo 1>&2 "($PROGRAM)Error: Invalid command '$PROGRAM'"; exit 1;;
+    --help) CMD=""; usage; exit 0;;
+    --mklinks)
+        cd `dirname $0`
+        for CMD in project.{create,delete,list,upload,Flows} \
+                   flow.{execute,Jobs,Executions,Running} \
+                   exec.{cancel,pause,resume,Status,Logs,Updates}; do
+            ln -sfv Azkaban Azkaban.$CMD
+        done; exit 0;;
+    *) logERROR "Invalid sub command '$CMD'"; CMD=""; usage; exit 1;;
 esac
-sleep 30
-echo END

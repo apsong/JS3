@@ -270,15 +270,15 @@ case "$CMD" in
                     if (start>0&&end>0) d=strftime("%H:%M:%S", (end-start)/1000, 1); else d="N/A"
                     if (start>0) start=strftime("%Y%m%d-%H:%M:%S", start/1000); else start="N/A"
                     if (end>0) end=strftime("%Y%m%d-%H:%M:%S", end/1000); else end="N/A"
-                    s=sprintf("%-28s  %-15s  %-17s  %-17s  %-10s  %8s", id, type, start, end, status, d)
+                    s=sprintf("%-28s  %-15s  %-17s  %-17s  %-9s  %8s", id, type, start, end, status, d)
                     if (key=="nodes")
                         results["ZZZZ"]=s ;#Make sure to be last line
                     else
                         results[start end id]=s
                 }
             } END {
-                print "JOB                           TYPE             START              END                STATUS      DURATION"
-                print "----------------------------  ---------------  -----------------  -----------------  ----------  --------"
+                print "JOB                           TYPE             START              END                STATUS     DURATION"
+                print "----------------------------  ---------------  -----------------  -----------------  ---------  --------"
                 n=asorti(results, D)
                 for (i=1; i<=n; i++) print(results[D[i]])
             }'

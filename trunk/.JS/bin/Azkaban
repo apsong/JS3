@@ -5,6 +5,10 @@ PROGRAM=`basename $0`
 ################################################################################
 #0:DEBUG  1:INFO  2:WARN  3:ERROR
 logLEVEL=2
+logDEBUG()
+{
+    [ $logLEVEL -le 0 ] && echo 1>&2 "DEBUG:" "$@"
+}
 logINFO()
 {
     [ $logLEVEL -le 1 ] && echo 1>&2 "INFO: " "$@"
@@ -12,6 +16,12 @@ logINFO()
 logERROR()
 {
     [ $logLEVEL -le 3 ] && echo 1>&2 "ERROR:" "$@"
+}
+
+EVAL()
+{
+    echo "#!CMD:[" $@ "]"
+    eval "$@"
 }
 ################################################################################
 usage()
@@ -28,6 +38,7 @@ usage()
         echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW [--raw]"
         echo "    Azkaban flow.Running    [URL] -p PROJECT -f FLOW"
         echo "    Azkaban exec.Status  [URL] -e EXECID [--raw]"
+        echo "    Azkaban exec.wait    [URL] -e EXECID"
         echo "    Azkaban exec.cancel  [URL] -e EXECID"
         echo "    Azkaban exec.pause   [URL] -e EXECID"
         echo "    Azkaban exec.resume  [URL] -e EXECID"
@@ -80,7 +91,7 @@ case "$CMD" in
         cd `dirname $0`
         for CMD in project.{create,delete,list,upload,Flows} \
                    flow.{execute,Jobs,Executions,Running} \
-                   exec.{cancel,pause,resume,Status,Logs,Updates}; do
+                   exec.{wait,cancel,pause,resume,Status,Logs,Updates}; do
             ln -sfv Azkaban Azkaban.$CMD
         done; exit 0;;
 esac
@@ -136,7 +147,10 @@ case "$CMD" in
     project.upload)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$ZIP" ] && { logERROR "ZIP must be set"; usage; exit 2;}
-        curl -k -X POST -i -H "Content-Type: multipart/mixed" \
+        if [ -d "$ZIP" ]; then
+            rm -f $ZIP.zip; EVAL zip -r $ZIP.zip $ZIP; ZIP=$ZIP.zip
+        fi
+        curl -k -X POST -H "Content-Type: multipart/mixed" \
             --form "session.id=$SESSION_ID" --form "ajax=upload" \
             --form "project=$PROJECT;type=plain" --form "file=@$ZIP;type=application/zip" \
             "$URL/manager"
@@ -168,7 +182,7 @@ case "$CMD" in
                     id=""; IN=""
                 }
             } END {
-                indent="    "
+                indent="  "
                 while (length(dependencies) > 0) {
                     for (ready_id in ready) {
                         for (id in dependencies) {
@@ -179,7 +193,7 @@ case "$CMD" in
                             }
                         }
                     }
-                    indent = indent "    "
+                    indent = indent "  "
                 }
             }'
         fi
@@ -219,6 +233,17 @@ case "$CMD" in
         curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
             "$URL/executor?ajax=resumeFlow"
         echo ;;
+    exec.wait)
+        [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
+        while [ 1 ]; do
+            OUTSTR=`Azkaban exec.Status -e $EXECID`
+            status=`echo "$OUTSTR" | awk '/^\[SUMMARY\]/{print $5}'`
+            case "$status" in
+                *ING)   logDEBUG "$status - sleep 10 to check again"; sleep 10;;
+                SUCCEEDED) logDEBUG "$status - exit 0"; echo $status; exit 0;;
+                *) logDEBUG "$status - exit 1"; echo $status; exit 1;;
+            esac
+        done ;;
     exec.Status)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
@@ -245,13 +270,15 @@ case "$CMD" in
                     if (start>0&&end>0) d=strftime("%H:%M:%S", (end-start)/1000, 1); else d="N/A"
                     if (start>0) start=strftime("%Y%m%d-%H:%M:%S", start/1000); else start="N/A"
                     if (end>0) end=strftime("%Y%m%d-%H:%M:%S", end/1000); else end="N/A"
-                    s=sprintf("%-28s %-12s  %-17s  %-17s  %-10s (%s)", id, type, start, end, status, d)
+                    s=sprintf("%-28s  %-15s  %-17s  %-17s  %-10s  %8s", id, type, start, end, status, d)
                     if (key=="nodes")
                         results["ZZZZ"]=s ;#Make sure to be last line
                     else
                         results[start end id]=s
                 }
             } END {
+                print "JOB                           TYPE             START              END                STATUS      DURATION"
+                print "----------------------------  ---------------  -----------------  -----------------  ----------  --------"
                 n=asorti(results, D)
                 for (i=1; i<=n; i++) print(results[D[i]])
             }'

@@ -25,9 +25,9 @@ usage()
         echo "    Azkaban project.Flows  [URL] -p PROJECT"
         echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW"
         echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH]"
-        echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW"
+        echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW [--raw]"
         echo "    Azkaban flow.Running    [URL] -p PROJECT -f FLOW"
-        echo "    Azkaban exec.Status  [URL] -e EXECID [--format]"
+        echo "    Azkaban exec.Status  [URL] -e EXECID [--raw]"
         echo "    Azkaban exec.cancel  [URL] -e EXECID"
         echo "    Azkaban exec.pause   [URL] -e EXECID"
         echo "    Azkaban exec.resume  [URL] -e EXECID"
@@ -99,8 +99,7 @@ while [ $# -gt 0 ]; do
         -s) shift; START=$1;;
         -l) shift; LENGTH=$1;;
         -t) shift; LAST_UPDATE_TIME=$1;;
-        --format) IS_FORMAT="YES";;
-        --load) IS_LOAD="YES";;
+        --raw) IS_RAW="YES";;
         --debug) logLEVEL=0;;
         --info)  logLEVEL=1;;
         --warn)  logLEVEL=2;;
@@ -116,7 +115,7 @@ done
 logINFO "URL=$URL"
 SESSION_ID=`getSessionID` || exit 2
 
-OUT=$RUNTIME/$CMD.out
+OUTFILE=$RUNTIME/$CMD.out
 case "$CMD" in
     project.create)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
@@ -150,9 +149,41 @@ case "$CMD" in
     flow.Jobs)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
-            "$URL/manager?ajax=fetchflowgraph"
-        echo ;;
+        OUTSTR=`curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+            "$URL/manager?ajax=fetchflowgraph" 2>&1`
+        if [ "$IS_RAW" = "YES" ]; then
+            echo "$OUTSTR"
+        else
+            echo "$OUTSTR" | awk -F: '
+            BEGIN { id=""; IN="" }
+            {
+                key=gensub(/[\" ]/, "", "g", $1)
+                val=gensub(/[\"\[\] ]|,$/, "", "g", $2)
+                if (key == "id") { id=val }
+                else if (key == "type") { type=val }
+                else if (key == "in") { IN = val }
+                if ($0 ~ /}/ && id != "") {
+                    if (IN == "") { ready[id]=1; print id }
+                    else { dependencies[id] = "," IN "," }
+                    id=""; IN=""
+                }
+            } END {
+                indent="    "
+                while (length(dependencies) > 0) {
+                    for (ready_id in ready) {
+                        for (id in dependencies) {
+                            gsub("," ready_id ",", ",", dependencies[id])
+                            if (dependencies[id] == ",") {
+                                ready[id]=1; print indent id
+                                delete dependencies[id]
+                            }
+                        }
+                    }
+                    indent = indent "    "
+                }
+            }'
+        fi
+        ;;
     flow.Executions)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
@@ -190,14 +221,12 @@ case "$CMD" in
         echo ;;
     exec.Status)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        if [ "$IS_LOAD" != "YES" ]; then
-            curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
-                "$URL/executor?ajax=fetchexecflow" > $OUT 2>&1
-        fi
-        if [ "$IS_FORMAT" != "YES" ]; then
-            cat $OUT
+        curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
+                "$URL/executor?ajax=fetchexecflow" >$OUTFILE 2>&1
+        if [ "$IS_RAW" = "YES" ]; then
+            cat $OUTFILE
         else
-            cat $OUT | awk '
+            cat $OUTFILE | awk '
             {
                 key=gensub(/[\",]/, "", "g", $1)
                 val=gensub(/[\",]/, "", "g", $3)

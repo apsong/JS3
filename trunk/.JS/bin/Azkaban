@@ -2,6 +2,12 @@
 
 PROGRAM=`basename $0`
 
+RUNTIME=.Azkaban
+RCFILE=$RUNTIME/initrc
+mkdir -p $RUNTIME
+[ -f $RCFILE ] && . $RCFILE
+[ -n "$AZKABAN_URL" ] && URL=$AZKABAN_URL
+[ -n "$AZKABAN_PROJECT" ] && PROJECT=$AZKABAN_PROJECT
 ################################################################################
 #0:DEBUG  1:INFO  2:WARN  3:ERROR
 logLEVEL=2
@@ -33,27 +39,26 @@ usage()
         echo "    Azkaban project.list   [URL]"
         echo "    Azkaban project.upload [URL] -p PROJECT -z ZIP"
         echo "    Azkaban project.Flows  [URL] -p PROJECT"
-        echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW"
+        echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW [--wait]"
+        echo "    Azkaban flow.Executing  [URL] -p PROJECT -f FLOW"
         echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH]"
         echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW [--raw]"
-        echo "    Azkaban flow.Running    [URL] -p PROJECT -f FLOW"
-        echo "    Azkaban exec.Status  [URL] -e EXECID [--raw]"
-        echo "    Azkaban exec.wait    [URL] -e EXECID"
         echo "    Azkaban exec.cancel  [URL] -e EXECID"
-        echo "    Azkaban exec.pause   [URL] -e EXECID"
-        echo "    Azkaban exec.resume  [URL] -e EXECID"
-        echo "    Azkaban exec.Logs    [URL] -e EXECID -j JOB [-s START] [-l LENGTH]"
-        echo "    Azkaban exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
+        echo "    Azkaban exec.wait    [URL] -e EXECID"
+        #echo "    Azkaban exec.pause   [URL] -e EXECID"
+        #echo "    Azkaban exec.resume  [URL] -e EXECID"
+        echo "    Azkaban exec.Status  [URL] -e EXECID [--raw]"
+        echo "    Azkaban exec.Logs    [URL] -e EXECID [-j JOB] [-s START] [-l LENGTH] [--raw]"
+        #echo "    Azkaban exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
     } | grep "$CMD" 1>&2
     echo 1>&2 ""
     echo 1>&2 "Note:"
-    echo 1>&2 '    URL: default to $AZKABAN_URL, or "http://localhost:8081"'
+    echo 1>&2 " 1. Defaults could be set in $RCFILE, which would be read first"
+    echo 1>&2 ' 2. URL: default to $AZKABAN_URL, or "http://localhost:8081"'
 }
 ################################################################################
-RUNTIME=.Azkaban
 getSessionID()
 {
-    mkdir -p $RUNTIME
     ID_FILE=$RUNTIME/session_id.`echo $URL | sed -e 's@/@@g'`
     if [ -f $ID_FILE ]; then
         lastmod_seconds=`stat -c %Y $ID_FILE`
@@ -90,13 +95,14 @@ case "$CMD" in
     --mklinks)
         cd `dirname $0`
         for CMD in project.{create,delete,list,upload,Flows} \
-                   flow.{execute,Jobs,Executions,Running} \
+                   flow.{execute,Jobs,Executions,Executing} \
                    exec.{wait,cancel,pause,resume,Status,Logs,Updates}; do
             ln -sfv Azkaban Azkaban.$CMD
         done; exit 0;;
 esac
 
 ### Main #######################################################################
+
 # Input arguments
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -110,7 +116,8 @@ while [ $# -gt 0 ]; do
         -s) shift; START=$1;;
         -l) shift; LENGTH=$1;;
         -t) shift; LAST_UPDATE_TIME=$1;;
-        --raw) IS_RAW="YES";;
+        --wait) IS_WAIT="YES";;
+        --raw)  IS_RAW="YES";;
         --debug) logLEVEL=0;;
         --info)  logLEVEL=1;;
         --warn)  logLEVEL=2;;
@@ -118,10 +125,10 @@ while [ $# -gt 0 ]; do
         --help) usage; exit 0;;
         *) logERROR "Invalid parameter '$1'"; usage; exit 1;;
     esac
-shift
+    shift
 done
+export IS_RAW logLEVEL
 
-[ -z "$URL" ] && URL=$AZKABAN_URL
 [ -z "$URL" ] && URL="http://localhost:8081"
 logINFO "URL=$URL"
 SESSION_ID=`getSessionID` || exit 2
@@ -163,7 +170,7 @@ case "$CMD" in
     flow.Jobs)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        OUTSTR=`curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+        OUTSTR=`curl -k# -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
             "$URL/manager?ajax=fetchflowgraph" 2>&1`
         if [ "$IS_RAW" = "YES" ]; then
             echo "$OUTSTR"
@@ -206,7 +213,7 @@ case "$CMD" in
         curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
             "$URL/manager?ajax=fetchFlowExecutions"
         echo ;;
-    flow.Running)
+    flow.Executing)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
@@ -215,9 +222,13 @@ case "$CMD" in
     flow.execute)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
-            "$URL/executor?ajax=executeFlow"
-        echo ;;
+        OUTSTR=`curl -k# -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+                "$URL/executor?ajax=executeFlow" 2>&1`
+        echo "$OUTSTR" | grep -v "#"
+        if [ "$IS_WAIT" = "YES" ]; then
+            EXECID=`echo "$OUTSTR" | awk '/"execid"/{print $3}'`
+            exec Azkaban exec.wait -e $EXECID
+        fi ;;
     exec.cancel)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
@@ -286,12 +297,24 @@ case "$CMD" in
         echo ;;
     exec.Logs)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        [ -z "$JOB" ] && { logERROR "JOB must be set"; usage; exit 2;}
         [ -z "$START" ] && START=0
         [ -z "$LENGTH" ] && LENGTH=99999999
-        curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID&jobId=$JOB&offset=$START&length=$LENGTH" \
-            "$URL/executor?ajax=fetchExecJobLogs"
-        echo ;;
+        if [ -z "$JOB" ]; then
+            JOBS=`Azkaban exec.Status -e $EXECID | awk '{if (NR>2 && $1!="[SUMMARY]") print $1}'`
+            for JOB in $JOBS; do
+                EVAL Azkaban exec.Logs -e $EXECID -j $JOB -s $START -l $LENGTH
+            done
+        else
+            OUTSTR=`curl -k# -G -d "session.id=$SESSION_ID&execid=$EXECID&jobId=$JOB&offset=$START&length=$LENGTH" "$URL/executor?ajax=fetchExecJobLogs" 2>&1`
+            if [ "$IS_RAW" = "YES" ]; then
+                echo "$OUTSTR"
+            else
+                echo "$OUTSTR" | awk '/"data" :/{
+                        n=split(substr($0, 13, length($0)-14), logs, /\\n/)
+                        for (i=1; i<=n; i++) { print logs[i] }
+                    }'
+            fi
+        fi ;;
     exec.Updates)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         [ -z "$LAST_UPDATE_TIME" ] && LAST_UPDATE_TIME=-1

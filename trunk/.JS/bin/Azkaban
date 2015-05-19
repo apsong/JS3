@@ -162,6 +162,7 @@ case "$CMD" in
             EVAL "cd $ZIP_DIR; zip -r $ZIP_NAME.zip $ZIP_NAME"
             ZIP=$ZIP_DIR/$ZIP_NAME.zip
         fi
+        [ ! -f "$ZIP" ] && { logERROR "ZIP '$ZIP' doesn't exit as a normal file"; exit 3;}
         $CURL -X POST -H "Content-Type: multipart/mixed" \
             --form "session.id=$SESSION_ID" --form "ajax=upload" \
             --form "project=$PROJECT;type=plain" --form "file=@$ZIP;type=application/zip" \
@@ -306,15 +307,15 @@ case "$CMD" in
         echo ;;
     exec.Logs)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        [ -z "$JOB" ] && {
-            logERROR "JOB must be set. Select one from the list below"
-            Azkaban exec.Status -e $EXECID
-            usage; exit 2;
-        }
         [ -z "$START" ] && START=0
         [ -z "$LENGTH" ] && LENGTH=50000
-        OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&jobId=$JOB&offset=$START&length=$LENGTH" \
-                "$URL/executor?ajax=fetchExecJobLogs"`
+        if [ -n "$JOB" ]; then
+            OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&offset=$START&length=$LENGTH" \
+                    "$URL/executor?ajax=fetchExecJobLogs&jobId=$JOB"`
+        else
+            OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&offset=$START&length=$LENGTH" \
+                    "$URL/executor?ajax=fetchExecFlowLogs"`
+        fi
         if [ "$IS_RAW" = "YES" ]; then
             echo "$OUTSTR"
         else

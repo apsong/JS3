@@ -23,6 +23,7 @@ logERROR()
 {
     [ $logLEVEL -le 3 ] && echo 1>&2 "ERROR:" "$@"
 }
+[ $logLEVEL -eq 0 ] && CURL="curl -v -ksS" || CURL="curl -ksS"
 
 EVAL()
 {
@@ -39,7 +40,7 @@ usage()
         echo "    Azkaban project.list   [URL]"
         echo "    Azkaban project.upload [URL] -p PROJECT -z ZIP"
         echo "    Azkaban project.Flows  [URL] -p PROJECT"
-        echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW [--wait]"
+        echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW [--wait] [flow.num.job.threads=1]"
         echo "    Azkaban flow.Executing  [URL] -p PROJECT -f FLOW"
         echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH]"
         echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW [--raw]"
@@ -76,7 +77,7 @@ getSessionID()
             fi
         fi
     fi
-    session_id=`curl -# -k -X POST -d "action=login&username=system&password=manage" $URL 2>&1 \
+    session_id=`$CURL -X POST -d "action=login&username=system&password=manage" $URL 2>&1 \
                 | awk -F\" '/session.id/{print $4}'`
     [ -z "$session_id" ] && { logERROR "Failed to get session_id"; return 1;}
     logINFO "Get session_id $session_id through authentication"
@@ -116,6 +117,7 @@ while [ $# -gt 0 ]; do
         -s) shift; START=$1;;
         -l) shift; LENGTH=$1;;
         -t) shift; LAST_UPDATE_TIME=$1;;
+        *=*) OPTIONS="$OPTIONS $1";;
         --wait) IS_WAIT="YES";;
         --raw)  IS_RAW="YES";;
         --debug) logLEVEL=0;;
@@ -138,16 +140,16 @@ case "$CMD" in
     project.create)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$DESCRIPTION" ] && DESCRIPTION=.
-        curl -k -X POST -d "session.id=$SESSION_ID&name=$PROJECT&description=$DESCRIPTION" \
+        $CURL -X POST -d "session.id=$SESSION_ID&name=$PROJECT&description=$DESCRIPTION" \
             "$URL/manager?action=create"
         echo ;;
     project.delete)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT" \
+        $CURL -G -d "session.id=$SESSION_ID&project=$PROJECT" \
             "$URL/manager?delete=true"
         ;;
     project.list)
-        curl -k -G -d "session.id=$SESSION_ID" "$URL/index" 2>/dev/null \
+        $CURL -G -d "session.id=$SESSION_ID" "$URL/index" 2>/dev/null \
             | awk '/project=|project-last-modified/{print gensub("<[^>]*>", "", "g")}' \
             | awk '{name=$1; getline; printf("%-20s %s %s\n", name, $4, $5)}' | sort -b -k 2
         ;;
@@ -155,22 +157,25 @@ case "$CMD" in
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$ZIP" ] && { logERROR "ZIP must be set"; usage; exit 2;}
         if [ -d "$ZIP" ]; then
-            rm -f $ZIP.zip; EVAL zip -r $ZIP.zip $ZIP; ZIP=$ZIP.zip
+            ZIP_DIR=`dirname $ZIP`; ZIP_NAME=`basename $ZIP`
+            rm -f $ZIP.zip
+            EVAL "cd $ZIP_DIR; zip -r $ZIP_NAME.zip $ZIP_NAME"
+            ZIP=$ZIP_DIR/$ZIP_NAME.zip
         fi
-        curl -k -X POST -H "Content-Type: multipart/mixed" \
+        $CURL -X POST -H "Content-Type: multipart/mixed" \
             --form "session.id=$SESSION_ID" --form "ajax=upload" \
             --form "project=$PROJECT;type=plain" --form "file=@$ZIP;type=application/zip" \
             "$URL/manager"
         echo ;;
     project.Flows)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT" \
+        $CURL -G -d "session.id=$SESSION_ID&project=$PROJECT" \
             "$URL/manager?ajax=fetchprojectflows"
         echo ;;
     flow.Jobs)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        OUTSTR=`curl -k# -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+        OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
             "$URL/manager?ajax=fetchflowgraph" 2>&1`
         if [ "$IS_RAW" = "YES" ]; then
             echo "$OUTSTR"
@@ -210,38 +215,42 @@ case "$CMD" in
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         [ -z "$START" ] && START=0
         [ -z "$LENGTH" ] && LENGTH=-1
-        curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
+        $CURL -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
             "$URL/manager?ajax=fetchFlowExecutions"
         echo ;;
     flow.Executing)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
+        $CURL -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
             "$URL/executor?ajax=getRunning"
         echo ;;
     flow.execute)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        OUTSTR=`curl -k# -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW" \
-                "$URL/executor?ajax=executeFlow" 2>&1`
-        echo "$OUTSTR" | grep -v "#"
+        for OPTION in $OPTIONS; do
+            PAIR=`echo $OPTION | awk -F= '{printf("&flowOverride[%s]=%s\n", $1, $2)}'`
+            PAIRS="$PAIRS$PAIR"
+        done
+        OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&$PAIRS" \
+                "$URL/executor?ajax=executeFlow"`
+        echo "$OUTSTR"
         if [ "$IS_WAIT" = "YES" ]; then
             EXECID=`echo "$OUTSTR" | awk '/"execid"/{print $3}'`
             exec Azkaban exec.wait -e $EXECID
         fi ;;
     exec.cancel)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
+        $CURL -G -d "session.id=$SESSION_ID&execid=$EXECID" \
             "$URL/executor?ajax=cancelFlow"
         echo ;;
     exec.pause)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
+        $CURL -G -d "session.id=$SESSION_ID&execid=$EXECID" \
             "$URL/executor?ajax=pauseFlow"
         echo ;;
     exec.resume)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
+        $CURL -G -d "session.id=$SESSION_ID&execid=$EXECID" \
             "$URL/executor?ajax=resumeFlow"
         echo ;;
     exec.wait)
@@ -257,7 +266,7 @@ case "$CMD" in
         done ;;
     exec.Status)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID" \
+        $CURL -G -d "session.id=$SESSION_ID&execid=$EXECID" \
                 "$URL/executor?ajax=fetchexecflow" >$OUTFILE 2>&1
         if [ "$IS_RAW" = "YES" ]; then
             cat $OUTFILE
@@ -297,28 +306,27 @@ case "$CMD" in
         echo ;;
     exec.Logs)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
+        [ -z "$JOB" ] && {
+            logERROR "JOB must be set. Select one from the list below"
+            Azkaban exec.Status -e $EXECID
+            usage; exit 2;
+        }
         [ -z "$START" ] && START=0
-        [ -z "$LENGTH" ] && LENGTH=99999999
-        if [ -z "$JOB" ]; then
-            JOBS=`Azkaban exec.Status -e $EXECID | awk '{if (NR>2 && $1!="[SUMMARY]") print $1}'`
-            for JOB in $JOBS; do
-                EVAL Azkaban exec.Logs -e $EXECID -j $JOB -s $START -l $LENGTH
-            done
+        [ -z "$LENGTH" ] && LENGTH=50000
+        OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&jobId=$JOB&offset=$START&length=$LENGTH" \
+                "$URL/executor?ajax=fetchExecJobLogs"`
+        if [ "$IS_RAW" = "YES" ]; then
+            echo "$OUTSTR"
         else
-            OUTSTR=`curl -k# -G -d "session.id=$SESSION_ID&execid=$EXECID&jobId=$JOB&offset=$START&length=$LENGTH" "$URL/executor?ajax=fetchExecJobLogs" 2>&1`
-            if [ "$IS_RAW" = "YES" ]; then
-                echo "$OUTSTR"
-            else
-                echo "$OUTSTR" | awk '/"data" :/{
-                        n=split(substr($0, 13, length($0)-14), logs, /\\n/)
-                        for (i=1; i<=n; i++) { print logs[i] }
-                    }'
-            fi
+            echo "$OUTSTR" | awk '/"data" :/{
+                n=split(substr($0, 13, length($0)-14), logs, /\\n/)
+                for (i=1; i<=n; i++) { print logs[i] }
+            }'
         fi ;;
     exec.Updates)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         [ -z "$LAST_UPDATE_TIME" ] && LAST_UPDATE_TIME=-1
-        curl -k -G -d "session.id=$SESSION_ID&execid=$EXECID&lastUpdateTime=$LAST_UPDATE_TIME" \
+        $CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&lastUpdateTime=$LAST_UPDATE_TIME" \
             "$URL/executor?ajax=fetchexecflowupdate"
         echo ;;
     *) logERROR "Invalid sub command '$CMD'"; CMD=""; usage; exit 1;;

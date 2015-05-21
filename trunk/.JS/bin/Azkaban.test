@@ -26,6 +26,9 @@ echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Re
 touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 }
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+HD=`ls -d /mnt/test-CCB/2015*-*/modules/hadoop/hadoop-2.2.0 | sort | tail -1`
+EVAL mkdir -p $HD/output
+EVAL mkdir -p $HD/tmp
 
 do_test()
 {
@@ -42,29 +45,32 @@ do_test()
 
     for I in `seq $RUN_NUM`; do
         echo "#################### ROUND: $I ####################"
+        if [ $PROJECT = "proj_main" ]; then
+            EVAL rm -f $HD/output/2015/m/03/JP000/pdf/*
+        fi
         OUTS=`EVAL Azkaban flow.execute -p $PROJECT -f $FLOW $OPTIONS`
         echo "$OUTS"
+        EVAL Azkaban flow.Executing -p $PROJECT -f $FLOW
+        EVAL Azkaban flow.Executions -p $PROJECT -f $FLOW
         EXECID=`echo "$OUTS" | awk '/"execid"/{print $3}'`
         EVAL Azkaban exec.wait -e $EXECID
         EVAL Azkaban exec.Status -e $EXECID
         EVAL Azkaban exec.Logs -e $EXECID
+        if [ $PROJECT = "proj_main" ]; then
+            EVAL "find $HD/output -name '*.pdf' | wc -l"
+            EVAL "du -sh $HD/output"
+            EVAL ls -l $HD/output/2015/m/03/JP000/pdf/
+        fi
     done
+    EVAL Azkaban flow.Executing -p $PROJECT -f $FLOW
+    EVAL Azkaban flow.Executions -p $PROJECT -f $FLOW
 }
 
-HD=`ls -d /mnt/test-CCB/2015*-*/modules/hadoop/hadoop-2.2.0 | sort | tail -1`
-EVAL mkdir -p $HD/output
-EVAL mkdir -p $HD/tmp
-
 {
-    ZIP=/TEST/CCB/flows/staticdata/; OPTIONS=; RUN_NUM=1
+    ZIP=/TEST/CCB/flows/staticdata/; OPTIONS=; RUN_NUM=3
     do_test
-    ZIP=/TEST/CCB/flows/historyflow/; OPTIONS=; RUN_NUM=1
+    ZIP=/TEST/CCB/flows/historyflow/; OPTIONS=; RUN_NUM=3
     do_test
-
-    EVAL rm -f $HD/output/2015/m/03/JP000/pdf/*
     ZIP=/TEST/CCB/flows/main; OPTIONS="flow.num.job.threads=1"; RUN_NUM=5
     do_test
-    EVAL "find $HD/output -name '*.pdf' | wc -l"
-    EVAL "du -sh $HD/output"
-    EVAL ls -l $HD/output/2015/m/03/JP000/pdf/
 } 2>&1 | tee `NEWFILE $PROGRAM.out`

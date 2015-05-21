@@ -3,9 +3,9 @@
 PROGRAM=`basename $0`
 
 RUNTIME=~/.Azkaban
-RCFILE=$RUNTIME/initrc
+RC_FILE=$RUNTIME/initrc
 mkdir -p $RUNTIME
-[ -f $RCFILE ] && . $RCFILE
+[ -f $RC_FILE ] && . $RC_FILE
 [ -n "$AZKABAN_URL" ] && URL=$AZKABAN_URL
 [ -n "$AZKABAN_PROJECT" ] && PROJECT=$AZKABAN_PROJECT
 ################################################################################
@@ -23,7 +23,6 @@ logERROR()
 {
     [ $logLEVEL -le 3 ] && echo 1>&2 "ERROR:" "$@"
 }
-[ $logLEVEL -eq 0 ] && CURL="curl -v -ksS" || CURL="curl -ksS"
 
 EVAL()
 {
@@ -41,8 +40,8 @@ usage()
         echo "    Azkaban project.upload [URL] -p PROJECT -z ZIP"
         echo "    Azkaban project.Flows  [URL] -p PROJECT [--raw]"
         echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW [--wait] [flow.num.job.threads=1]"
-        echo "    Azkaban flow.Executing  [URL] -p PROJECT -f FLOW"
-        echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH]"
+        #echo "    Azkaban flow.Executing  [URL] -p PROJECT -f FLOW"
+        echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH] [--raw]"
         echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW [--raw]"
         echo "    Azkaban exec.cancel  [URL] -e EXECID"
         echo "    Azkaban exec.wait    [URL] -e EXECID"
@@ -51,16 +50,18 @@ usage()
         echo "    Azkaban exec.Status  [URL] -e EXECID [--raw]"
         echo "    Azkaban exec.Logs    [URL] -e EXECID [-j JOB] [-s START] [-l LENGTH] [--raw]"
         #echo "    Azkaban exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
+        echo "    Azkaban session.reinit [URL]"
     } | grep "$CMD" 1>&2
     echo 1>&2 ""
     echo 1>&2 "Note:"
-    echo 1>&2 " 1. Defaults would be read from $RCFILE first"
+    echo 1>&2 " 1. Defaults would be read from $RC_FILE first"
     echo 1>&2 ' 2. URL: default to $AZKABAN_URL, or "http://localhost:8081"'
 }
 ################################################################################
 getSessionID()
 {
     ID_FILE=$RUNTIME/session_id.`echo $URL | sed -e 's@/@@g'`
+    [ "$1" = "--reinit" ] && > $ID_FILE
     if [ -f $ID_FILE ]; then
         lastmod_seconds=`stat -c %Y $ID_FILE`
         current_sedonds=`date +%s`
@@ -97,7 +98,8 @@ case "$CMD" in
         cd `dirname $0`
         for CMD in project.{create,delete,list,upload,Flows} \
                    flow.{execute,Jobs,Executions,Executing} \
-                   exec.{wait,cancel,pause,resume,Status,Logs,Updates}; do
+                   exec.{wait,cancel,pause,resume,Status,Logs,Updates} \
+                   session.reinit; do
             ln -sfv Azkaban Azkaban.$CMD
         done; exit 0;;
 esac
@@ -129,7 +131,8 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-export IS_RAW logLEVEL
+export logLEVEL
+[ $logLEVEL -eq 0 ] && CURL="curl -v -ksS" || CURL="curl -ksS"
 
 [ -z "$URL" ] && URL="http://localhost:8081"
 logINFO "URL=$URL"
@@ -137,6 +140,8 @@ SESSION_ID=`getSessionID` || exit 2
 
 OUTFILE=$RUNTIME/$CMD.out
 case "$CMD" in
+    session.reinit)
+        getSessionID --reinit ;;
     project.create)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$DESCRIPTION" ] && DESCRIPTION=.
@@ -149,7 +154,7 @@ case "$CMD" in
             "$URL/manager?delete=true"
         ;;
     project.list)
-        $CURL -G -d "session.id=$SESSION_ID" "$URL/index" 2>/dev/null \
+        $CURL -G -d "session.id=$SESSION_ID" "$URL/index?all" 2>/dev/null \
             | awk '/project=|project-last-modified/{print gensub("<[^>]*>", "", "g")}' \
             | awk '{name=$1; getline; printf("%-20s %s %s\n", name, $4, $5)}' | sort -b -k 2
         ;;
@@ -212,15 +217,43 @@ case "$CMD" in
                     indent = indent "  "
                 }
             }'
-        fi
-        ;;
+        fi ;;
     flow.Executions)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         [ -z "$START" ] && START=0
         [ -z "$LENGTH" ] && LENGTH=-1
-        $CURL -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
-            "$URL/manager?ajax=fetchFlowExecutions"
+        OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
+            "$URL/manager?ajax=fetchFlowExecutions"`
+        if [ "$IS_RAW" = "YES" ]; then
+            echo "$OUTSTR"
+        else
+            echo "$OUTSTR" | awk '
+            BEGIN {
+                print "EXECID  START              END                STATUS     DURATION"
+                print "------  -----------------  -----------------  ---------  --------"
+            }
+            {
+                key=gensub(/[\",]/, "", "g", $1)
+                val=gensub(/[\",]/, "", "g", $3)
+                if (key=="execId") {
+                    execId=val
+                } else if (key=="startTime") {
+                    start=val
+                } else if (key=="endTime") {
+                    end=val
+                } else if (key=="status") {
+                    status=val
+                } else if ($0 ~ /}.*,/) {
+                    if (start>0&&end>0) d=strftime("%H:%M:%S", (end-start)/1000, 1); else d="N/A"
+                    if (start>0) start=strftime("%Y%m%d-%H:%M:%S", start/1000); else start="N/A"
+                    if (end>0) end=strftime("%Y%m%d-%H:%M:%S", end/1000); else end="N/A"
+                    printf("%6d  %-17s  %-17s  %-9s  %-8s\n", execId, start, end, status, d)
+                } else if (key=="total") {
+                    printf("(total: %d)\n", val)
+                }
+            }'
+        fi
         echo ;;
     flow.Executing)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
@@ -294,7 +327,7 @@ case "$CMD" in
                     if (start>0&&end>0) d=strftime("%H:%M:%S", (end-start)/1000, 1); else d="N/A"
                     if (start>0) start=strftime("%Y%m%d-%H:%M:%S", start/1000); else start="N/A"
                     if (end>0) end=strftime("%Y%m%d-%H:%M:%S", end/1000); else end="N/A"
-                    s=sprintf("%-28s  %-15s  %-17s  %-17s  %-9s  %8s", id, type, start, end, status, d)
+                    s=sprintf("%-28s  %-15s  %-17s  %-17s  %-9s  %-8s", id, type, start, end, status, d)
                     if (key=="nodes")
                         results["ZZZZ"]=s ;#Make sure to be last line
                     else

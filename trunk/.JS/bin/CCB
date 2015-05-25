@@ -35,7 +35,7 @@ done
 case `basename $DIR` in
     BASE)
         DIR_BASE=$DIR
-        DIR_SOLO=`find -L \`dirname $DIR\` -name "[0-9]*[0-9]-*" | sort | tail -1`
+        DIR_SOLO=`find -L \`dirname $DIR\` -maxdepth 1 -name "[0-9]*[0-9]-*" | sort | tail -1`
         ;;
     [0-9]*[0-9]-*)
         DIR_BASE=`dirname $DIR`/BASE
@@ -125,7 +125,7 @@ case $PROGRAM in
         EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh start -jobhistory && cd -"
         EVAL "cd $MODULES/hadoop/ && ./yarn_daemon.sh start -all && cd -"
         echo
-        EVAL "jps | grep -E 'Node|Manager|JobHistoryServer'"
+        EVAL "jps | grep -E 'Node|Manager|JobHistoryServer' | sort -n"
         ;;
     hadoop.restart)
         hadoop.stop

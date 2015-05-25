@@ -37,7 +37,12 @@ while [ $# -gt 0 ]; do
             LOCAL_BASE=TEST
             TYPE=$1
             ;;
-        ccb*)
+        ccb)
+            BUILD_BASE=/mnt/81-build/DataPentamix/ccb
+            LOCAL_BASE=CCB
+            TYPE=$1
+            ;;
+        ccb-base)
             BUILD_BASE=/mnt/81-build/DataPentamix/ccb
             LOCAL_BASE=CCB
             TYPE=$1
@@ -75,4 +80,4 @@ for TGZ in $TGZS; do
     #TGZ=$LOCAL_TGZ
     EVAL "mkdir -p $DIR && cd $DIR && tar xzvf $TGZ" || exit 4
 done
-[ "$TYPE" = "ccb-base" ] && { ln -sv $DIR /$LOCAL_BASE/BASE; cp -v /$LOCAL_BASE/fonts/* /$LOCAL_BASE/BASE/fonts;}
+[ "$TYPE" = "ccb-base" ] && { rm -f /$LOCAL_BASE/BASE; ln -sv $DIR /$LOCAL_BASE/BASE; cp -v /$LOCAL_BASE/fonts/* /$LOCAL_BASE/BASE/fonts;}

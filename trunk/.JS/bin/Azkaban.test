@@ -27,8 +27,6 @@ touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
 }
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 HD=`ls -d /mnt/test-CCB/2015*-*/modules/hadoop/hadoop-2.2.0 | sort | tail -1`
-EVAL mkdir -p $HD/output
-EVAL mkdir -p $HD/tmp
 
 do_test()
 {
@@ -46,7 +44,8 @@ do_test()
     for I in `seq $RUN_NUM`; do
         echo "#################### ROUND: $I ####################"
         if [ $PROJECT = "proj_main" ]; then
-            EVAL rm -f $HD/output/2015/m/03/JP000/pdf/*
+            EVAL mkdir -p $HD/output
+            EVAL mkdir -p $HD/tmp
         fi
         OUTS=`EVAL Azkaban flow.execute -p $PROJECT -f $FLOW $OPTIONS`
         echo "$OUTS"
@@ -57,9 +56,11 @@ do_test()
         EVAL Azkaban exec.Status -e $EXECID
         EVAL Azkaban exec.Logs -e $EXECID
         if [ $PROJECT = "proj_main" ]; then
-            EVAL "find $HD/output -name '*.pdf' | wc -l"
-            EVAL "du -sh $HD/output"
-            EVAL ls -l $HD/output/2015/m/03/JP000/pdf/
+            EVAL rm -rf $HD/output.$I
+            EVAL mv $HD/output $HD/output.$I
+            EVAL "find $HD/output.$I -name '*.pdf' | wc -l"
+            EVAL "du -sh $HD/output.$I"
+            EVAL ls -l $HD/output.$I/2015/m/03/JP000/pdf/
         fi
     done
     EVAL Azkaban flow.Executing -p $PROJECT -f $FLOW
@@ -67,10 +68,12 @@ do_test()
 }
 
 {
-    ZIP=/TEST/CCB/flows/staticdata/; OPTIONS=; RUN_NUM=3
+    EVAL Azkaban session.reinit || exit 1 ;#TODO: verify exit status~~
+
+    ZIP=/TEST/CCB/flows/staticdata/; OPTIONS=; RUN_NUM=1
     do_test
-    ZIP=/TEST/CCB/flows/historyflow/; OPTIONS=; RUN_NUM=3
+    ZIP=/TEST/CCB/flows/historyflow/; OPTIONS=; RUN_NUM=1
     do_test
-    ZIP=/TEST/CCB/flows/main; OPTIONS="flow.num.job.threads=1"; RUN_NUM=5
+    ZIP=/TEST/CCB/flows/main; OPTIONS="flow.num.job.threads=1"; RUN_NUM=10
     do_test
 } 2>&1 | tee `NEWFILE $PROGRAM.out`

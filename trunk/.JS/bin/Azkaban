@@ -1,6 +1,7 @@
 #! /bin/sh
 
 PROGRAM=`basename $0`
+AZKABAN=`dirname $0/Azkaban`
 
 RUNTIME=~/.Azkaban
 RC_FILE=$RUNTIME/initrc
@@ -97,8 +98,8 @@ case "$CMD" in
     --mklinks)
         cd `dirname $0`
         for CMD in project.{create,delete,list,upload,Flows} \
-                   flow.{execute,Jobs,Executions,Executing} \
-                   exec.{wait,cancel,pause,resume,Status,Logs,Updates} \
+                   flow.{execute,Jobs,Executions} \
+                   exec.{wait,cancel,pause,resume,Status,Logs} \
                    session.reinit; do
             ln -sfv Azkaban Azkaban.$CMD
         done; exit 0;;
@@ -273,7 +274,7 @@ case "$CMD" in
         echo "$OUTSTR"
         if [ "$IS_WAIT" = "YES" ]; then
             EXECID=`echo "$OUTSTR" | awk '/"execid"/{print $3}'`
-            exec Azkaban exec.wait -e $EXECID
+            exec $AZKABAN exec.wait -e $EXECID
         fi ;;
     exec.cancel)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
@@ -293,7 +294,7 @@ case "$CMD" in
     exec.wait)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         while [ 1 ]; do
-            OUTSTR=`Azkaban exec.Status -e $EXECID`
+            OUTSTR=`$AZKABAN exec.Status -e $EXECID`
             status=`echo "$OUTSTR" | awk '/^\[SUMMARY\]/{print $5}'`
             case "$status" in
                 *ING)   logDEBUG "$status - sleep 10 to check again"; sleep 10;;

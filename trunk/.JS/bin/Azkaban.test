@@ -74,6 +74,6 @@ do_test()
     do_test
     ZIP=/TEST/CCB/flows/historyflow/; OPTIONS=; RUN_NUM=1
     do_test
-    ZIP=/TEST/CCB/flows/main; OPTIONS="flow.num.job.threads=1"; RUN_NUM=10
+    ZIP=/TEST/CCB/flows/main; OPTIONS="flow.num.job.threads=1"; RUN_NUM=1
     do_test
 } 2>&1 | tee `NEWFILE $PROGRAM.out`

@@ -33,12 +33,12 @@ for F in `ls *-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].csv`; do
     mv -v $F $DIR
 done
 
-SRC=`ls -d TradFlows-* | awk -F- '{print $2}'`
-DST=201503
-[ "$SRC" = "$DST" ] && exit 0
-for FILE in `find -depth -name "*$SRC*"`; do
-    NEW_FILE=`echo $FILE | sed -e "s/$SRC/$DST/g"`
-    NEW_FILE=`dirname $FILE`/`basename $NEW_FILE`
-    mv -v $FILE $NEW_FILE
-    [ -f $NEW_FILE ] && sed -i -e "s/$SRC/$DST/g" $NEW_FILE
-done
+#SRC=`ls -d TradFlows-* | awk -F- '{print $2}'`
+#DST=201503
+#[ "$SRC" = "$DST" ] && exit 0
+#for FILE in `find -depth -name "*$SRC*"`; do
+#    NEW_FILE=`echo $FILE | sed -e "s/$SRC/$DST/g"`
+#    NEW_FILE=`dirname $FILE`/`basename $NEW_FILE`
+#    mv -v $FILE $NEW_FILE
+#    [ -f $NEW_FILE ] && sed -i -e "s/$SRC/$DST/g" $NEW_FILE
+#done

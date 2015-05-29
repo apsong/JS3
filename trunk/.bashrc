@@ -12,6 +12,7 @@ export PATH=/opt/node-v0.10.29-linux-x64/bin:$PATH
 export PATH=/opt/mysql/bin:$PATH
 export PATH=/opt/pypy3/bin:$PATH
 export PATH=$HOME/.bin:$PATH
+[ -d /CCB/BASE/modules/hadoop ] && export PATH=`ls -d /CCB/BASE/modules/hadoop/hadoop-*/bin`:$PATH
 
 [ "$HOSTNAME" != "jinsong" ] && export LANG=C
 

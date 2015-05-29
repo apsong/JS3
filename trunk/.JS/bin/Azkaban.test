@@ -32,7 +32,7 @@ do_test()
 {
     PROJECT=proj_`basename $ZIP | sed -e 's/\..*$//'`
 
-    EVAL Azkaban project.delete -p $PROJECT || exit 1
+    #EVAL Azkaban project.delete -p $PROJECT || exit 1
     EVAL Azkaban project.create -p $PROJECT
     EVAL Azkaban project.list
     EVAL Azkaban project.upload -p $PROJECT -z $ZIP
@@ -54,7 +54,7 @@ do_test()
         EXECID=`echo "$OUTS" | awk '/"execid"/{print $3}'`
         EVAL Azkaban exec.wait -e $EXECID
         EVAL Azkaban exec.Status -e $EXECID
-        EVAL Azkaban exec.Logs -e $EXECID
+        #EVAL Azkaban exec.Logs -e $EXECID
         if [ $PROJECT = "proj_main" ]; then
             EVAL rm -rf $HD/output.$I
             EVAL mv $HD/output $HD/output.$I

@@ -1,0 +1,84 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
+EVAL()
+{
+    echo "#!CMD:[" $@ "]"
+    eval "$@"
+}
+
+NEWFILE()
+{
+    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
+
+    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
+
+    mkdir -p .$FILE || exit 101
+    if [ -h $FILE ]; then
+rm -f $FILE
+    elif [ -e $FILE ]; then
+echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
+        mv $FILE $REAL_FILE.bak
+    fi
+touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
+}
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+[ "$1" = "-v" ] && { SUMMARY=0; shift;} || SUMMARY=1
+
+gawk -F " - " -v SUMMARY=$SUMMARY '
+function show_stats() {
+    if (SUMMARY) {
+        cmd = gensub(/\n.*$/, "", "g", cmd)
+        #if (cmd !~ /LOAD/) { ;#TODO
+            for (i=1; i<length(stats); i++) {
+                n=split(gensub(/^ +/, "", "g", stats[i]), a, / +/)
+                if (a[1] ~ /Driver.run/) {
+                    printf("%8d\t%s\t%s\n", a[5], a[4], cmd)
+                    sum_ms += a[5]
+                    break
+                }
+            }
+        #}
+    } else {
+        print "\n=========================================================================="
+        print cmd
+        print "----method-----------------start----------end---------duration---------ms-"
+        for (i=1; i<length(stats); i++) { print(stats[i]) }
+    }
+    delete stats
+    stats[0] = ""
+    indent = 0
+}
+BEGIN {stats[0] = ""; last_start = 0; last_end = 0; indent = 0; sum_ms=0}
+{
+    if ($2 ~ /Parsing command:/) {
+        show_stats()
+        cmd = gensub(/Parsing command:[ \t]*/, "", "h", $2)
+        while (1) { getline; if (NF < 2 ) { if ($0 !~ /^[ \t]*$/) cmd=cmd "\n" $0 } else break }
+        cmd = gensub(/^\n|\n$/, "", "g", cmd)
+    }
+    if ($2 ~ /^<\/PERFLOG/) {
+        split($2, a, /[ =]/)
+        if (a[9] > -1) {
+            method=a[3]
+            start=strftime("%T", a[5]/1000) "." sprintf("%03d", a[5]%1000)
+            end  =strftime("%T", a[7]/1000) "." sprintf("%03d", a[7]%1000)
+            duration=strftime("%T", a[9]/1000, 1) "." sprintf("%03d", a[9]%1000)
+
+            if (a[5]==a[7]) { }
+            else if (a[5]<=last_start && a[7]>=last_end) { indent++ }
+            else { indent=0 }
+            for (i=0;i<indent;i++) { method = "  " method }
+            stats[length(stats)] = sprintf("%-22s  %s  %s  %s  %8d", method, start, end, duration, a[9])
+
+            last_start = a[5]
+            last_end = a[7]
+        }
+    }
+} END {
+    show_stats()
+    str_ms=strftime("%T", sum_ms/1000, 1) "." sprintf("%03d", sum_ms%1000)
+    printf("%8d\t%s\t%s\n", sum_ms, str_ms, "[SUMMARY]")
+}' "$@"

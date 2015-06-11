@@ -47,3 +47,5 @@ export PATH="$_PATH"
 unset TZ
 ulimit -c unlimited
 ulimit -u 10240
+
+export MAVEN_OPTS="-Dmaven.artifact.threads=10 -Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"

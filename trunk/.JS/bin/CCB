@@ -37,9 +37,13 @@ case `basename $DIR` in
         DIR_BASE=$DIR
         DIR_SOLO=`find -L \`dirname $DIR\` -maxdepth 1 -name "[0-9]*[0-9]-*" | sort | tail -1`
         ;;
-    [0-9]*[0-9]-*)
+    *[0-9]*[0-9]-*)
         DIR_BASE=`dirname $DIR`/BASE
         DIR_SOLO=$DIR
+        ;;
+    *)
+        echo 1>&2 "Error: Invalid `basename $DIR`"
+        exit 103
         ;;
 esac
 

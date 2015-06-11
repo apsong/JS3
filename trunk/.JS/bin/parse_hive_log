@@ -31,14 +31,16 @@ gawk -F " - " -v SUMMARY=$SUMMARY '
 function show_stats() {
     if (SUMMARY) {
         cmd = gensub(/\n.*$/, "", "g", cmd)
-        for (i=1; i<length(stats); i++) {
-            n=split(gensub(/^ +/, "", "g", stats[i]), a, / +/)
-            if (a[1] ~ /Driver.run/) {
-                printf("%8d  %s  %s\n", a[5], a[4], cmd)
-                sum_ms += a[5]
-                break
+        #if (cmd !~ /LOAD/) { ;#TODO
+            for (i=1; i<length(stats); i++) {
+                n=split(gensub(/^ +/, "", "g", stats[i]), a, / +/)
+                if (a[1] ~ /Driver.run/) {
+                    printf("%8d\t%s\t%s\n", a[5], a[4], cmd)
+                    sum_ms += a[5]
+                    break
+                }
             }
-        }
+        #}
     } else {
         print "\n=========================================================================="
         print cmd
@@ -78,5 +80,5 @@ BEGIN {stats[0] = ""; last_start = 0; last_end = 0; indent = 0; sum_ms=0}
 } END {
     show_stats()
     str_ms=strftime("%T", sum_ms/1000, 1) "." sprintf("%03d", sum_ms%1000)
-    printf("%8d  %s  %s\n", sum_ms, str_ms, "[SUMMARY]")
+    printf("%8d\t%s\t%s\n", sum_ms, str_ms, "[SUMMARY]")
 }' "$@"

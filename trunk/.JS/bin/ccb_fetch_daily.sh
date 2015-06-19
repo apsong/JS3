@@ -26,7 +26,7 @@ log()
 
 ######################### MAIN #########################################
 #a. Azkaban input parameter 'unzipdate'
-azkb_unzipdate=`awk -F= '/unzipdate/{print $2}' PrepareGenerateReports_props*`
+azkb_unzipdate=`find -name "*_props_*" -exec awk -F= '/unzipdate/{print $2}' {} \; | tail -1`
 logDEBUG "Azkaban input parameter: unzipdate=$azkb_unzipdate"
 
 #b. Last unzip date from log

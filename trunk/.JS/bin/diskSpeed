@@ -1,9 +1,0 @@
-#! /bin/sh
-
-PROGRAM=`basename $0`
-
-for i in `seq 5`; do
-    dd if=/dev/zero of=diskSpeed.log bs=100M count=9
-    #dd of=/dev/null if=diskSpeed.log bs=100M count=9
-done
-rm -f diskSpeed.log

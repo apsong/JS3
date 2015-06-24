@@ -1,0 +1,43 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
+EVAL()
+{
+    echo "#!CMD:[" $@ "]"
+    eval "$@"
+}
+
+NEWFILE()
+{
+    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
+
+    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
+
+    mkdir -p .$FILE || exit 101
+    if [ -h $FILE ]; then
+rm -f $FILE
+    elif [ -e $FILE ]; then
+echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
+        mv $FILE $REAL_FILE.bak
+    fi
+touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
+}
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+
+sed -i -e 's/192\.168\.99\.[0-9]\+/192.168.99.242/' -e 's/@hadoop@/@sjin@/' -e 's^#BASE_DIR#@.*@g^#BASE_DIR#@/mnt/sjin-TEST/CCB/data@g^' staticdata/PrepareExecEnvironment.job
+sed -i -e 's^@\./data^@/mnt/sjin-TEST/CCB/data^' historyflow/PrepareExecEnvironment.job
+sed -i -e 's/^yyyymm=.*/yyyymm=201503/' main/getMonth.sh
+sed -i -e 's/2048m/1024m/g' -e 's/3072m/1024m/g' main/dataanalytics/*.job
+sed -i -e 's/192\.168\.99\.[0-9]\+/192.168.99.242/' main/*.rptdesign
+
+EVAL grep '\\#' staticdata/PrepareExecEnvironment.job
+echo
+EVAL grep '\\#' historyflow/PrepareExecEnvironment.job
+echo
+EVAL grep '^yyyymm=' main/getMonth.sh
+echo
+EVAL grep '192.168.99' main/*.rptdesign
+echo
+EVAL grep -h 'Xmx' main/dataanalytics/*.job

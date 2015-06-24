@@ -1,0 +1,77 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
+EVAL()
+{
+    echo 1>&2 "#!CMD:[" $@ "]"
+    eval "$@"
+    echo
+}
+
+NEWFILE()
+{
+    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
+
+    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
+
+    mkdir -p .$FILE || exit 101
+    if [ -h $FILE ]; then
+rm -f $FILE
+    elif [ -e $FILE ]; then
+echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
+        mv $FILE $REAL_FILE.bak
+    fi
+touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
+}
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+HD=`ls -d /mnt/test-CCB/2015*-*/modules/hadoop/hadoop-2.2.0 | sort | tail -1`
+
+do_test()
+{
+    PROJECT=proj_`basename $ZIP | sed -e 's/\..*$//'`
+
+    EVAL Azkaban project.delete -p $PROJECT || exit 1
+    EVAL Azkaban project.create -p $PROJECT
+    EVAL Azkaban project.list
+    EVAL Azkaban project.upload -p $PROJECT -z $ZIP
+    EVAL Azkaban project.Flows -p $PROJECT --raw
+
+    FLOWS=`Azkaban project.Flows -p $PROJECT`
+    for FLOW in $FLOWS; do
+        EVAL Azkaban flow.Jobs -p $PROJECT -f $FLOW
+
+        for I in `seq $RUN_NUM`; do
+            echo "#################### ROUND: $I ####################"
+            if [ $PROJECT = "proj_main" ]; then
+                EVAL mkdir -p $HD/output
+                EVAL mkdir -p $HD/tmp
+            fi
+            OUTS=`EVAL Azkaban flow.execute -p $PROJECT -f $FLOW $OPTIONS`
+            echo "$OUTS"
+            EVAL Azkaban flow.Executing -p $PROJECT -f $FLOW
+            EVAL Azkaban flow.Executions -p $PROJECT -f $FLOW
+            EXECID=`echo "$OUTS" | awk '/"execid"/{print $3}'`
+            EVAL Azkaban exec.wait -e $EXECID
+            EVAL Azkaban exec.Status -e $EXECID
+            EVAL Azkaban exec.Logs -e $EXECID
+            if [ $PROJECT = "proj_main" ]; then
+                EVAL rm -rf $HD/output.$I
+                EVAL mv $HD/output $HD/output.$I
+                EVAL "find $HD/output.$I -name '*.pdf' | wc -l"
+                EVAL "du -sh $HD/output.$I"
+                EVAL ls -l $HD/output.$I/2015/m/03/JP000/pdf/
+            fi
+        done
+        EVAL Azkaban flow.Executing -p $PROJECT -f $FLOW
+        EVAL Azkaban flow.Executions -p $PROJECT -f $FLOW
+    done
+}
+
+{
+    EVAL Azkaban session.reinit || exit 1 ;#TODO: verify exit status~~
+
+    ZIP=/TEST/CCB/testflows/test; OPTIONS=; RUN_NUM=1
+    do_test
+} 2>&1 | tee `NEWFILE $PROGRAM.out`

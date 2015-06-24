@@ -1,0 +1,22 @@
+#! /bin/sh
+
+PROGRAM=`basename $0`
+
+usage()
+{
+    echo 1>&2 "Usage: $PROGRAM begin_yyyymmdd end_yyyymmdd"
+    echo 1>&2 " $PROGRAM 20150101 20151231"
+}
+
+[ $# -ne 2 ] && { usage; exit 1;}
+[ `expr $1 : '[0-9]\+'` -ne 8 ] && { "'$1' should be of format 'yyyymmdd'"; exit 1;}
+[ `expr $2 : '[0-9]\+'` -ne 8 ] && { "'$2' should be of format 'yyyymmdd'"; exit 1;}
+date -d "$1" >/dev/null || exit 1
+date -d "$2" >/dev/null || exit 1
+
+END=`date -d "$2" +%Y%m%d`
+DAY=`date -d "$1" +%Y%m%d`
+while [ $DAY -le $END ]; do
+    echo $DAY
+    DAY=`date -d "$DAY +1 day" +%Y%m%d`
+done

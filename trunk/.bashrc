@@ -7,8 +7,7 @@ source $HOME/.bash_ccb_functions
 export PS1="[\u@\h]\w> "
 export JAVA_HOME=/opt/jdk
 export JS_HOME=$HOME/.JS
-export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.2.1/bin:$JS_HOME/bin:$JS_HOME/tea:$JS_HOME/py:$PATH
-export PATH=/opt/node-v0.10.29-linux-x64/bin:$PATH
+export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.3.3/bin:$JS_HOME/bin:$JS_HOME/tea:$JS_HOME/py:$PATH
 export PATH=/opt/mysql/bin:$PATH
 export PATH=/opt/pypy3/bin:$PATH
 export PATH=$HOME/.bin:$PATH

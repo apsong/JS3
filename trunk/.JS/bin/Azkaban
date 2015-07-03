@@ -42,15 +42,18 @@ usage()
         echo "    Azkaban project.Flows  [URL] -p PROJECT [--raw]"
         echo "    Azkaban flow.execute    [URL] -p PROJECT -f FLOW [--wait] [flow.num.job.threads=1]"
         #echo "    Azkaban flow.Executing  [URL] -p PROJECT -f FLOW"
-        echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-s START] [-l LENGTH] [--raw]"
+        echo "    Azkaban flow.Executions [URL] -p PROJECT -f FLOW [-o OFFSET] [-l LENGTH] [--raw]"
         echo "    Azkaban flow.Jobs       [URL] -p PROJECT -f FLOW [--raw]"
+        echo "    Azkaban flow.schedule   [URL] -p PROJECT -f FLOW [-D yyyymmdd] [-T HH:MM:SS] [-R n{M|w|d|h|m|s}]"
         echo "    Azkaban exec.cancel  [URL] -e EXECID"
         echo "    Azkaban exec.wait    [URL] -e EXECID"
         #echo "    Azkaban exec.pause   [URL] -e EXECID"
         #echo "    Azkaban exec.resume  [URL] -e EXECID"
         echo "    Azkaban exec.Status  [URL] -e EXECID [--raw]"
-        echo "    Azkaban exec.Logs    [URL] -e EXECID [-j JOB] [-s START] [-l LENGTH] [--raw]"
+        echo "    Azkaban exec.Logs    [URL] -e EXECID [-j JOB] [-o OFFSET] [-l LENGTH] [--raw]"
         #echo "    Azkaban exec.Updates [URL] -e EXECID [-t LAST_UPDATE_TIME]"
+        echo "    Azkaban schedule.list   [URL]"
+        echo "    Azkaban schedule.cancel [URL] -s SCHEDULE_ID"
         echo "    Azkaban session.reinit [URL]"
     } | grep "$CMD" 1>&2
     echo 1>&2 ""
@@ -98,8 +101,9 @@ case "$CMD" in
     --mklinks)
         cd `dirname $0`
         for CMD in project.{create,delete,list,upload,Flows} \
-                   flow.{execute,Jobs,Executions} \
+                   flow.{execute,Jobs,Executions,schedule} \
                    exec.{wait,cancel,pause,resume,Status,Logs} \
+                   schedule.list \
                    session.reinit; do
             ln -sfv Azkaban Azkaban.$CMD
         done; exit 0;;
@@ -117,9 +121,13 @@ while [ $# -gt 0 ]; do
         -f) shift; FLOW=$1;;
         -e) shift; EXECID=$1;;
         -j) shift; JOB=$1;;
-        -s) shift; START=$1;;
+        -o) shift; OFFSET=$1;;
         -l) shift; LENGTH=$1;;
         -t) shift; LAST_UPDATE_TIME=$1;;
+        -s) shift; SCHEDULE_ID=$1;;
+        -D) shift; SCHEDULE_DATE=$1;;
+        -T) shift; SCHEDULE_TIME=$1;;
+        -R) shift; SCHEDULE_RECUR=$1;;
         *=*) OPTIONS="$OPTIONS $1";;
         --wait) IS_WAIT="YES";;
         --raw)  IS_RAW="YES";;
@@ -155,7 +163,7 @@ case "$CMD" in
             "$URL/manager?delete=true"
         ;;
     project.list)
-        $CURL -G -d "session.id=$SESSION_ID" "$URL/index?all" 2>/dev/null \
+        $CURL -G -d "session.id=$SESSION_ID" "$URL/index?all" \
             | awk '/project=|project-last-modified/{print gensub("<[^>]*>", "", "g")}' \
             | awk '{name=$1; getline; printf("%-20s %s %s\n", name, $4, $5)}' | sort -b -k 2
         ;;
@@ -222,10 +230,10 @@ case "$CMD" in
     flow.Executions)
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
-        [ -z "$START" ] && START=0
+        [ -z "$OFFSET" ] && OFFSET=0
         [ -z "$LENGTH" ] && LENGTH=-1
-        OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&project=$PROJECT&flow=$FLOW&start=$START&length=$LENGTH" \
-            "$URL/manager?ajax=fetchFlowExecutions"`
+        OUTSTR=`$CURL -G -d "project=$PROJECT&flow=$FLOW&start=$OFFSET&length=$LENGTH" \
+            "$URL/manager?ajax=fetchFlowExecutions&session.id=$SESSION_ID"`
         if [ "$IS_RAW" = "YES" ]; then
             echo "$OUTSTR"
         else
@@ -276,6 +284,25 @@ case "$CMD" in
             EXECID=`echo "$OUTSTR" | awk '/"execid"/{print $3}'`
             exec $AZKABAN exec.wait -e $EXECID
         fi ;;
+    flow.schedule)
+        [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
+        [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
+        PROJECT_ID=`$CURL -G "$URL/manager?session.id=$SESSION_ID&project=$PROJECT" \
+                    | awk '/projectId.*=/{print gensub(";", "", "g", $NF)}'`
+        [ -z "$PROJECT_ID" ] && { echo 1>&2 "Error: failed to get PROJECT_ID for '$PROJECT'"; exit 1;}
+        [ -z "$SCHEDULE_TIME" ] && SCHEDULE_TIME="+1minute"
+        [ -z "$SCHEDULE_DATE" ] && SCHEDULE_DATE=`date +"%Y%m%d"`
+        SCHEDULE_TIME=`date -d "$SCHEDULE_TIME" +"%H,%M,%p,%Z"`
+        SCHEDULE_DATE=`date -d "$SCHEDULE_DATE" +"%m/%d/%Y"`
+        [ -n "$SCHEDULE_RECUR" ] && SCHEDULE_RECUR="&is_recurring=on&period=$SCHEDULE_RECUR"
+        for OPTION in $OPTIONS; do
+            PAIR=`echo $OPTION | awk -F= '{printf("&flowOverride[%s]=%s\n", $1, $2)}'`
+            PAIRS="$PAIRS$PAIR"
+        done
+        $CURL -G -d "project=$PROJECT&projectName=$PROJECT&projectId=$PROJECT_ID&flow=$FLOW&$PAIRS" \
+                -d "scheduleTime=$SCHEDULE_TIME&scheduleDate=$SCHEDULE_DATE$SCHEDULE_RECUR" \
+                "$URL/schedule?ajax=scheduleFlow&session.id=$SESSION_ID"
+        ;;
     exec.cancel)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         $CURL -G -d "session.id=$SESSION_ID&execid=$EXECID" \
@@ -344,13 +371,13 @@ case "$CMD" in
         echo ;;
     exec.Logs)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
-        [ -z "$START" ] && START=0
+        [ -z "$OFFSET" ] && OFFSET=0
         [ -z "$LENGTH" ] && LENGTH=50000
         if [ -n "$JOB" ]; then
-            OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&offset=$START&length=$LENGTH" \
+            OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&offset=$OFFSET&length=$LENGTH" \
                     "$URL/executor?ajax=fetchExecJobLogs&jobId=$JOB"`
         else
-            OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&offset=$START&length=$LENGTH" \
+            OUTSTR=`$CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&offset=$OFFSET&length=$LENGTH" \
                     "$URL/executor?ajax=fetchExecFlowLogs"`
         fi
         if [ "$IS_RAW" = "YES" ]; then
@@ -366,6 +393,25 @@ case "$CMD" in
         [ -z "$LAST_UPDATE_TIME" ] && LAST_UPDATE_TIME=-1
         $CURL -G -d "session.id=$SESSION_ID&execid=$EXECID&lastUpdateTime=$LAST_UPDATE_TIME" \
             "$URL/executor?ajax=fetchexecflowupdate"
+        echo ;;
+    schedule.list)
+        $CURL -G -d "session.id=$SESSION_ID" "$URL/schedule" \
+        | awk '/<td>[^<]+<\/td>|project=.*flow=/ {print gensub(/.*<td>|<\/td>.*|.*project=|">.*/, "", "g")}' \
+        | awk 'BEGIN {
+                print "SCHEDULE_ID  PROJECT.FLOW     USER    FirstSched      NextExec  RepeatsEvery"
+                print "-----------  ------------  -------  ------------  ------------  ------------"
+               }{
+                 id=$0; getline; pf=gensub("&flow=", ".", "g"); getline; user=$0; getline;
+                 first=gensub(/^..|-/, "", "g", $1) "-" gensub(/:..$/, "", "g", $2); getline;
+                 _next=gensub(/^..|-/, "", "g", $1) "-" gensub(/:..$/, "", "g", $2); getline;
+                 repeat=$0; getline; hasSLA=$0;
+                 printf("%-3s %21s %8s  %s  %s  %12s\n", id, pf, user, first, _next, repeat);
+               }'
+        ;;
+    schedule.cancel)
+        [ -z "$SCHEDULE_ID" ] && { logERROR "SCHEDULE_ID must be set"; usage; exit 2;}
+        $CURL -G -d "session.id=$SESSION_ID&scheduleId=$SCHEDULE_ID" \
+            "$URL/schedule?action=removeSched"
         echo ;;
     *) logERROR "Invalid sub command '$CMD'"; CMD=""; usage; exit 1;;
 esac

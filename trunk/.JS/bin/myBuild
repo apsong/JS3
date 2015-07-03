@@ -70,9 +70,9 @@ DIR=/$LOCAL_BASE/$NEW_BUILD
 mkdir -v "$DIR" || exit 1
 
 if [ "$TYPE" = "ccb" ]; then
-    TGZS=`ls $BUILD_BASE/$BUILD_DATE/*-solo-redhat*.tar.gz` || exit 3
+    TGZS=`ls $BUILD_BASE/$BUILD_DATE/*-solo-centos*.tar.gz` || exit 3
 else
-    TGZS=`ls $BUILD_BASE/$BUILD_DATE/*[0-9]-redhat*.tar.gz` || exit 3
+    TGZS=`ls $BUILD_BASE/$BUILD_DATE/*[0-9]-centos*.tar.gz` || exit 3
 fi
 for TGZ in $TGZS; do
     #LOCAL_TGZ=~/$LOCAL_BASE/`basename $TGZ`

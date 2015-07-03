@@ -103,7 +103,7 @@ case "$CMD" in
         for CMD in project.{create,delete,list,upload,Flows} \
                    flow.{execute,Jobs,Executions,schedule} \
                    exec.{wait,cancel,pause,resume,Status,Logs} \
-                   schedule.list \
+                   schedule.{list,cancel} \
                    session.reinit; do
             ln -sfv Azkaban Azkaban.$CMD
         done; exit 0;;
@@ -410,8 +410,8 @@ case "$CMD" in
         ;;
     schedule.cancel)
         [ -z "$SCHEDULE_ID" ] && { logERROR "SCHEDULE_ID must be set"; usage; exit 2;}
-        $CURL -G -d "session.id=$SESSION_ID&scheduleId=$SCHEDULE_ID" \
+        $CURL -X POST -d "session.id=$SESSION_ID&scheduleId=$SCHEDULE_ID" \
             "$URL/schedule?action=removeSched"
-        echo ;;
+        ;;
     *) logERROR "Invalid sub command '$CMD'"; CMD=""; usage; exit 1;;
 esac

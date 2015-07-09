@@ -1,7 +1,7 @@
 #! /bin/sh
 
 PROGRAM=`basename $0`
-AZKABAN=`dirname $0/Azkaban`
+AZKABAN=`dirname $0`/Azkaban
 
 RUNTIME=~/.Azkaban
 RC_FILE=$RUNTIME/initrc
@@ -11,7 +11,7 @@ mkdir -p $RUNTIME
 [ -n "$AZKABAN_PROJECT" ] && PROJECT=$AZKABAN_PROJECT
 ################################################################################
 #0:DEBUG  1:INFO  2:WARN  3:ERROR
-logLEVEL=2
+[ -z "$logLEVEL" ] && logLEVEL=2
 logDEBUG()
 {
     [ $logLEVEL -le 0 ] && echo 1>&2 "DEBUG:" "$@"
@@ -23,6 +23,14 @@ logINFO()
 logERROR()
 {
     [ $logLEVEL -le 3 ] && echo 1>&2 "ERROR:" "$@"
+}
+log()
+{
+    echo 1>&2 "[`date +%Y/%m/%d-%T`]" "$@"
+}
+logInPlace()
+{
+    echo -ne 1>&2 "\r[`date +%Y/%m/%d-%T`]" "$@"
 }
 
 EVAL()
@@ -325,13 +333,14 @@ case "$CMD" in
         echo ;;
     exec.wait)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
+        log "Waiting for execid=$EXECID ..."
         while [ 1 ]; do
-            OUTSTR=`$AZKABAN exec.Status -e $EXECID`
-            status=`echo "$OUTSTR" | awk '/^\[SUMMARY\]/{print $5}'`
-            case "$status" in
-                *ING)   logDEBUG "$status - sleep 10 to check again"; sleep 10;;
-                SUCCEEDED) logDEBUG "$status - exit 0"; echo $status; exit 0;;
-                *) logDEBUG "$status - exit 1"; echo $status; exit 1;;
+            OUTSTR=`$AZKABAN exec.Status -e $EXECID | tail -1`
+            logInPlace "(" $OUTSTR ")"
+            case "`echo $OUTSTR | awk '{print $4}'`" in
+                *ING)   sleep 2;;
+                SUCCEEDED) echo 1>&2; exit 0;;
+                *) echo 1>&2 " - exit 1"; exit 1;;
             esac
         done ;;
     exec.Status)
@@ -350,7 +359,7 @@ case "$CMD" in
                         if (start>0&&end>0) d=strftime("%H:%M:%S", (end-start)/1000, 1); else d="N/A"
                         if (start>0) start=strftime("%Y%m%d-%H:%M:%S", start/1000); else start="N/A"
                         if (end>0) end=strftime("%Y%m%d-%H:%M:%S", end/1000); else end="N/A"
-                        printf("%-32s  %-15s  %-17s  %-17s  %-9s  %-8s\n", id, type, start, end, status, d)
+                        printf("%-32s  %-17s  %-17s  %-9s  %-8s\n", id, start, end, status, d)
                         $1=""; return
                     }
                     while ($NF=="{") { getline; NextRecord(INDENT+2); }
@@ -372,8 +381,8 @@ case "$CMD" in
                 }
             }
             BEGIN {
-                print "JOB                               TYPE             START              END                STATUS     DURATION"
-                print "--------------------------------  ---------------  -----------------  -----------------  ---------  --------"
+                print "JOB                               START              END                STATUS     DURATION"
+                print "--------------------------------  -----------------  -----------------  ---------  --------"
                 NextRecord(-2)
             } {} END {}'
         fi;;

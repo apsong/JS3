@@ -340,40 +340,43 @@ case "$CMD" in
                 "$URL/executor?ajax=fetchexecflow" >$OUTFILE
         if [ "$IS_RAW" = "YES" ]; then
             cat $OUTFILE
+            echo
         else
             cat $OUTFILE | awk '
+            function NextRecord(INDENT,  id,type,start,end,status)
             {
-                key=gensub(/[\",]/, "", "g", $1)
-                val=gensub(/[\",]/, "", "g", $3)
-                if (key=="id") {
-                    id=val
-                } else if (key=="type") {
-                    type=val
-                } else if (key=="startTime") {
-                    start=val
-                } else if (key=="endTime") {
-                    end=val
-                } else if (key=="status") {
-                    status=val
-                } else if (key=="nodes" || $0 ~ /}.*,/) {
-                    if (key=="nodes") id = "[SUMMARY]"
-                    if (start>0&&end>0) d=strftime("%H:%M:%S", (end-start)/1000, 1); else d="N/A"
-                    if (start>0) start=strftime("%Y%m%d-%H:%M:%S", start/1000); else start="N/A"
-                    if (end>0) end=strftime("%Y%m%d-%H:%M:%S", end/1000); else end="N/A"
-                    s=sprintf("%-28s  %-15s  %-17s  %-17s  %-9s  %-8s", id, type, start, end, status, d)
-                    if (key=="nodes")
-                        results["ZZZZ"]=s ;#Make sure to be last line
-                    else
-                        results[start end id]=s
+                while (1) {
+                    if ($1~/}/) {
+                        if (start>0&&end>0) d=strftime("%H:%M:%S", (end-start)/1000, 1); else d="N/A"
+                        if (start>0) start=strftime("%Y%m%d-%H:%M:%S", start/1000); else start="N/A"
+                        if (end>0) end=strftime("%Y%m%d-%H:%M:%S", end/1000); else end="N/A"
+                        printf("%-32s  %-15s  %-17s  %-17s  %-9s  %-8s\n", id, type, start, end, status, d)
+                        $1=""; return
+                    }
+                    while ($NF=="{") { getline; NextRecord(INDENT+2); }
+
+                    key=gensub(/[\",]/, "", "g", $1)
+                    val=gensub(/[\",]/, "", "g", $3)
+                    if (key=="id") {
+                        id=sprintf("%" INDENT "s%s", "", val)
+                    } else if (key=="type") {
+                        type=val
+                    } else if (key=="startTime") {
+                        start=val
+                    } else if (key=="endTime") {
+                        end=val
+                    } else if (key=="status") {
+                        status=val
+                    }
+                    if (!getline) { return }
                 }
-            } END {
-                print "JOB                           TYPE             START              END                STATUS     DURATION"
-                print "----------------------------  ---------------  -----------------  -----------------  ---------  --------"
-                n=asorti(results, D)
-                for (i=1; i<=n; i++) print(results[D[i]])
-            }'
-        fi
-        echo ;;
+            }
+            BEGIN {
+                print "JOB                               TYPE             START              END                STATUS     DURATION"
+                print "--------------------------------  ---------------  -----------------  -----------------  ---------  --------"
+                NextRecord(-2)
+            } {} END {}'
+        fi;;
     exec.Logs)
         [ -z "$EXECID" ] && { logERROR "EXECID must be set"; usage; exit 2;}
         [ -z "$OFFSET" ] && OFFSET=0

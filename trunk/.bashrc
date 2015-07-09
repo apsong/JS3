@@ -11,7 +11,7 @@ export PATH=$JAVA_HOME/bin:/opt/apache-maven-3.3.3/bin:$JS_HOME/bin:$JS_HOME/tea
 export PATH=/opt/mysql/bin:$PATH
 export PATH=/opt/pypy3/bin:$PATH
 export PATH=$HOME/.bin:$PATH
-[ -d /CCB/BASE/modules/hadoop ] && export PATH=`ls -d /CCB/BASE/modules/hadoop/hadoop-*/bin`:$PATH
+export PATH=/MINE/hadoop-2.6.0/bin:$PATH
 
 [ "$HOSTNAME" != "jinsong" ] && export LANG=C
 

@@ -102,7 +102,7 @@ case "$CMD" in
         cd `dirname $0`
         for CMD in project.{create,delete,list,upload,Flows} \
                    flow.{execute,Jobs,Executions,schedule} \
-                   exec.{wait,cancel,pause,resume,Status,Logs} \
+                   exec.{wait,cancel,Status,Logs} \
                    schedule.{list,cancel} \
                    session.reinit; do
             ln -sfv Azkaban Azkaban.$CMD
@@ -136,6 +136,7 @@ while [ $# -gt 0 ]; do
         --warn)  logLEVEL=2;;
         --error) logLEVEL=3;;
         --help) usage; exit 0;;
+        --savedefault) IS_SAVE_DEFAULT=YES;;
         *) logERROR "Invalid parameter '$1'"; usage; exit 1;;
     esac
     shift
@@ -144,6 +145,10 @@ export logLEVEL
 [ $logLEVEL -eq 0 ] && CURL="curl -v -ksS" || CURL="curl -ksS"
 
 [ -z "$URL" ] && URL="http://localhost:8081"
+if [ "$IS_SAVE_DEFAULT" = "YES" ]; then
+    [ "$URL" != "http://localhost:8081" ] && echo "URL=$URL" >> $RC_FILE
+    [ "$PROJECT" != "" ] && echo "PROJECT=$PROJECT" >> $RC_FILE
+fi
 logINFO "URL=$URL"
 SESSION_ID=`getSessionID` || exit 2
 
@@ -231,7 +236,7 @@ case "$CMD" in
         [ -z "$PROJECT" ] && { logERROR "PROJECT must be set"; usage; exit 2;}
         [ -z "$FLOW" ] && { logERROR "FLOW must be set"; usage; exit 2;}
         [ -z "$OFFSET" ] && OFFSET=0
-        [ -z "$LENGTH" ] && LENGTH=-1
+        [ -z "$LENGTH" ] && LENGTH=100
         OUTSTR=`$CURL -G -d "project=$PROJECT&flow=$FLOW&start=$OFFSET&length=$LENGTH" \
             "$URL/manager?ajax=fetchFlowExecutions&session.id=$SESSION_ID"`
         if [ "$IS_RAW" = "YES" ]; then

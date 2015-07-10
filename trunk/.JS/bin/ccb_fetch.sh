@@ -1,11 +1,12 @@
 #!/bin/bash
 
+set -e -o pipefail
+
 # Directories from which the *.gz and *.dat will be fetched
 SRC_DIR=/home/ap/dip/file/input/p1000/000000000/data
-SRC_DIR=/data/xfxw/data.p9
 
 # Writable directories for us to unzip the files and save logs
-WORK_DIR=/data/xfxw/data.test
+WORK_DIR=/tmp/ccb.test
 
 ADD_MAP="
     P1000_101008_000000000_ALLYCARD_CUST_INFO_ADD_:AllyCardCustomerInfo_ADD_
@@ -41,8 +42,8 @@ ALL_MAP="
          P1000_101008_000000000_ECTIP_TRAD_FLOW_ALL_:TradFlows_ALL_
        P1000_101008_000000000_POS_POSB_TXN_LIST_ALL_:posFlow_ALL_
 
-    P1000_101008_000000000_CUST_ACTION_REPORT_ALL_:CustWhiteList_ALL_
 "
+#    P1000_101008_000000000_CUST_ACTION_REPORT_ALL_:CustWhiteList_ALL_
 DAILY_MAP="
     P1000_101008_000000000_ALLYCARD_CUST_INFO_ADD_:AllyCardCustomerInfo_ADD_
       P1000_101008_000000000_ALLYCARD_TRAD_FLOW_ALL_:AllyTradeFlow_ALL_
@@ -50,7 +51,7 @@ DAILY_MAP="
 ######################### LOG ##########################################
 PROGRAM=`basename $0`
 LOG=$WORK_DIR/.$PROGRAM.log
-touch $LOG || exit 1
+touch $LOG
 
 #0:DEBUG  1:NORMAL
 logLEVEL=0
@@ -102,9 +103,9 @@ yesterday=`date -d '-1 day' +%Y%m%d`
 logDEBUG "yesterday=$yesterday"
 
 #1. Choose which file map to use depending on $1 (the first parameter: 'ADD', 'ALL')
+[ $# -eq 0 ] && { usage; exit 1;}
 map=${1}_MAP
 MAP=${!map}
-[ -z "$MAP" ] && { usage; exit 1;}
 #1. Set unzipdate
 unzipdate_begin=$2
 unzipdate_end=$3
@@ -146,11 +147,11 @@ for DAY in `seq_yyyymmdd $unzipdate_begin $unzipdate_end`; do
                 *.gz)
                     NEW_PATH=$WORK_DIR/`basename $CCB_PATH | sed -e "s/$CCB_PATTERN/$NEW_PATTERN/" -e 's/\.gz$//'`
                     log "$CCB_PATH => $NEW_PATH"
-                    gunzip -c $CCB_PATH >$NEW_PATH 2>>$LOG || exit 5;;
+                    { gunzip -c $CCB_PATH | sed -e 's/|@|/|/g' >$NEW_PATH; } 2>>$LOG;;
                 *.dat)
                     NEW_PATH=$WORK_DIR/`basename $CCB_PATH | sed -e "s/$CCB_PATTERN/$NEW_PATTERN/"`
                     log "$CCB_PATH -> $NEW_PATH"
-                    cp $CCB_PATH $NEW_PATH 2>> $LOG || exit 5;;
+                    { cat       $CCB_PATH | sed -e 's/|@|/|/g' >$NEW_PATH; } 2>>$LOG;;
             esac
             num=`expr $num + 1`
         done

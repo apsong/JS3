@@ -1,6 +1,7 @@
-#! /bin/sh
+#! /bin/bash
 
 PROGRAM=`basename $0`
+DPP=${0/$PROGRAM/DPP}
 
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
 EVAL()
@@ -8,70 +9,51 @@ EVAL()
     echo "#!CMD:[" $@ "]" | awk '{printf "%.256s\n", $0}'
     eval "$@"
 }
-
-NEWFILE()
-{
-    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
-
-    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
-
-    mkdir -p .$FILE || exit 101
-    if [ -h $FILE ]; then
-rm -f $FILE
-    elif [ -e $FILE ]; then
-echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
-        mv $FILE $REAL_FILE.bak
-    fi
-touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
-}
 ##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
 
-DIR=$PWD
-while [ "$DIR" != "/" ]; do
-    [ -f $DIR/service.sh ] && break || DIR=`dirname $DIR`
+DPP_HOME=$PWD
+while [ 1 ]; do
+    [ "$DPP_HOME" = "/" ] && { echo 1>&2 "Error: Incorrect work dir: cannot find DPP_HOME"; exit 1;} 
+    [ -d "$DPP_HOME/modules" ] && break
+    DPP_HOME=`dirname $DPP_HOME`
 done
-[ ! -f $DIR/service.sh ] && { echo 1>&2 "Error: Incorrect work dir."; exit 1;}
 
-case `basename $DIR` in
-    BASE)
-        DIR_BASE=$DIR
-        DIR_SOLO=`find -L \`dirname $DIR\` -maxdepth 1 -name "[0-9]*[0-9]-*" | sort | tail -1`
-        ;;
-    *[0-9]*[0-9]-*)
-        DIR_BASE=`dirname $DIR`/BASE
-        DIR_SOLO=$DIR
-        ;;
-    *)
-        echo 1>&2 "Error: Invalid `basename $DIR`"
-        exit 103
-        ;;
-esac
-
-MODULES=$DIR_BASE/modules
-SOLO_MODULES=$DIR_SOLO/modules
-#SERVICE=$DIR/service.sh
-#DS_CFG=$MODULES/DocumentService/config/server.cfg
-#JS_CFG=$MODULES/JobScheduler/config/server.cfg
-#JS_JOB=$MODULES/JobScheduler/config/job.xml
-#DS_SH=$MODULES/DocumentService/bin/startServer.sh
-#SE_SH=$MODULES/SearchEngine/bin/startServer.sh
+MODULES=$DPP_HOME/modules
 
 LANG=zh_CN.UTF-8
 LC_ALL=zh_CN.UTF-8
 export LANG LC_ALL
 
+usage()
+{
+    echo 1>&2 "Usage: DPP hadoop.hdfs.{start|stop|restart}"
+    echo 1>&2 "       DPP hadoop.yarn.{start|stop|restart}"
+    echo 1>&2 "       DPP hadoop.jobhistory.{start|stop|restart}"
+    echo 1>&2 "       DPP hadoop.{start|stop|restart}"
+    echo 1>&2 "       DPP hive.{start|stop|restart}"
+    echo 1>&2 "       DPP sqoop.{start|stop|restart}"
+    echo 1>&2 "       DPP mysql.{start|stop|restart}"
+    echo 1>&2 "       DPP azkaban.{start|stop|restart}"
+    echo 1>&2 "       DPP tair.{start|stop|restart}"
+    echo 1>&2 "       DPP {start|stop|restart}"
+    echo 1>&2 "       DPP status"
+}
+
 namenode_safe_mode_off()
 {
-    LOG=$MODULES/hadoop/hadoop-*/logs/*namenode*.log
+    LOG=$MODULES/hadoop/logs/*namenode*.log
     for i in `seq 12`; do
         EVAL "sleep 5; # for leaving Safe mode"
-        if [ `grep -c "Safe mode is OFF" $LOG` -ge 1 ]; then
+        ON_NUM=`grep -c "Safe mode ON\." $LOG`
+        OFF_NUM=`grep -c "Safe mode is OFF" $LOG`
+        if [ $ON_NUM -eq $OFF_NUM -a $ON_NUM -ge 1 ]; then
             return 0
         fi
     done
     return 1
 }
-case $PROGRAM in
+
+case "$1" in
     hadoop.hdfs.stop)
         EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh stop -all && cd -"
         ;;
@@ -82,10 +64,10 @@ case $PROGRAM in
         EVAL "jps | grep -E 'Node\>'"
         ;;
     hadoop.hdfs.restart)
-        hadoop.hdfs.stop
+        $DPP hadoop.hdfs.stop
         echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/hadoop* ]"
         rm -f $MODULES/hadoop/hadoop-*/logs/hadoop*
-        hadoop.hdfs.start
+        $DPP hadoop.hdfs.start
         ;;
 
     hadoop.yarn.stop)
@@ -97,10 +79,10 @@ case $PROGRAM in
         EVAL "jps | grep -E 'Manager'"
         ;;
     hadoop.yarn.restart)
-        hadoop.yarn.stop
+        $DPP hadoop.yarn.stop
         echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/yarn* ]"
         rm -f $MODULES/hadoop/hadoop-*/logs/yarn*
-        hadoop.yarn.start
+        $DPP hadoop.yarn.start
         ;;
 
     hadoop.jobhistory.stop)
@@ -112,10 +94,10 @@ case $PROGRAM in
         EVAL "jps | grep -E 'JobHistoryServer'"
         ;;
     hadoop.jobhistory.restart)
-        hadoop.jobhistory.stop
+        $DPP hadoop.jobhistory.stop
         echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/*history* ]"
         rm -f $MODULES/hadoop/hadoop-*/logs/*history*
-        hadoop.jobhistory.start
+        $DPP hadoop.jobhistory.start
         ;;
 
     hadoop.stop)
@@ -132,10 +114,10 @@ case $PROGRAM in
         EVAL "jps | grep -E 'Node|Manager|JobHistoryServer' | sort -n"
         ;;
     hadoop.restart)
-        hadoop.stop
+        $DPP hadoop.stop
         echo "#!CMD:[ rm -f $MODULES/hadoop/hadoop-*/logs/* ]"
         rm -f $MODULES/hadoop/hadoop-*/logs/*
-        hadoop.start
+        $DPP hadoop.start
         ;;
 
     hive.stop)
@@ -144,112 +126,151 @@ case $PROGRAM in
     hive.start)
         EVAL "cd $MODULES/hive/ && ./startServer.sh all && cd -"
         echo
-        EVAL "ps -eo 'pid,args' | grep [R]unJar | sed -e 's/-[DX][^ ]* //g' -e 's@/[^ ]*/@@g'"
+        sleep 1
+        EVAL "jps -m | grep [R]unJar | sed -e 's@/[^ ]*/@@'"
         ;;
     hive.restart)
-        hive.stop
+        $DPP hive.stop
         echo "#!CMD:[ rm -f $MODULES/hive/logs/* ]"
         rm -f $MODULES/hive/logs/*
-        hive.start
+        $DPP hive.start
         ;;
 
-    mysql4ccb.stop)
+    mysql.stop)
         EVAL "cd $MODULES/mysql/ && ./stopServer.sh && cd -"
         ;;
-    mysql4ccb.start)
+    mysql.start)
         EVAL "cd $MODULES/mysql/ && ./startServer.sh && cd -"
         echo
         sleep 1
         echo
         EVAL "ps -eo 'pid,args' | grep [m]ysqld | sed -e 's/--[^ ]* //g'"
         ;;
-    mysql4ccb.restart)
-        mysql4ccb.stop
+    mysql.restart)
+        $DPP mysql.stop
         echo "#!CMD:[ rm -f $MODULES/mysql/logs/* ]"
         rm -f $MODULES/mysql/logs/*
-        mysql4ccb.start
+        $DPP mysql.start
+        ;;
+
+    zookeeper.stop)
+        EVAL "cd $MODULES/zookeeper/ && ./stopServer.sh && cd -"
+        ;;
+    zookeeper.start)
+        EVAL "cd $MODULES/zookeeper/ && ./startServer.sh && cd -"
+        sleep 1
+        echo
+        EVAL "jps -m | grep zoo"
+        ;;
+    zookeeper.restart)
+        $DPP zookeeper.stop
+        echo "#!CMD:[ rm -f $MODULES/zookeeper/logs/* ]"
+        rm -f $MODULES/zookeeper/logs/*
+        $DPP zookeeper.start
         ;;
 
     azkaban.stop)
-        EVAL "cd $SOLO_MODULES/AzkabanSoloServer/ && ./stopServer.sh all && cd -"
-        jps | awk '/AzkabanSingleServer/{system("kill " $1);}'
+        for D in `find $MODULES -maxdepth 1 -type d -name "Azkaban*Server"`; do
+            EVAL "cd $D && ./stopServer.sh && cd -"
+        done
+        jps | awk '/Azkaban.*Server/{system("kill " $1);}'
         ;;
     azkaban.start)
-        EVAL "cd $SOLO_MODULES/AzkabanSoloServer/ && ./startServer.sh all && cd -"
+        for D in `find $MODULES -maxdepth 1 -type d -name "Azkaban*Server"`; do
+            EVAL "cd $D && ./startServer.sh && cd -"
+        done
         echo
         EVAL "jps | grep Azkaban"
         ;;
     azkaban.restart)
-        azkaban.stop
+        $DPP azkaban.stop
         sleep 1
-        echo "#!CMD:[ rm -f $SOLO_MODULES/AzkabanSoloServer/{core.*, logs/*} ]"
-        rm -f $SOLO_MODULES/AzkabanSoloServer/{core.*, logs/*}
-        azkaban.start
+        echo "#!CMD:[ rm -f $MODULES/Azkaban*Server/{core.*, logs/*} ]"
+        rm -f $MODULES/Azkaban*Server/{core.*, logs/*}
+        $DPP azkaban.start
         ;;
 
     sqoop.stop)
-        EVAL "cd $SOLO_MODULES/sqoop/ && ./stopNode.sh && cd -"
+        EVAL "cd $MODULES/sqoop/ && ./stopNode.sh && cd -"
         ;;
     sqoop.start)
-        EVAL "cd $SOLO_MODULES/sqoop/ && ./startNode.sh && cd -"
+        EVAL "cd $MODULES/sqoop/ && ./startNode.sh && cd -"
         echo
         EVAL "jps | grep Bootstrap"
         ;;
     sqoop.restart)
-        sqoop.stop
+        $DPP sqoop.stop
         sleep 3
-        sqoop.start
+        $DPP sqoop.start
         ;;
 
     tair.stop)
-        EVAL "cd $SOLO_MODULES/tair/ && ./stopServer.sh -all && cd -"
+        EVAL "cd $MODULES/tair/ && ./stopServer.sh -all && cd -"
         sleep 5
         echo
         EVAL "ps -eo 'pid,args' | grep '/sbin/[t]air'"
         ;;
     tair.start)
-        EVAL "cd $SOLO_MODULES/tair/ && ./startServer.sh -all && cd -"
+        EVAL "cd $MODULES/tair/ && ./startServer.sh -all && cd -"
         echo
         EVAL "ps -eo 'pid,args' | grep '/sbin/[t]air'"
         ;;
     tair.restart)
-        tair.stop
-        echo "#!CMD:[ rm -f $SOLO_MODULES/tair/tair-*/* ]"
-        rm -f $SOLO_MODULES/tair/tair-*/logs/*
+        $DPP tair.stop
+        echo "#!CMD:[ rm -f $MODULES/tair/tair-*/* ]"
+        rm -f $MODULES/tair/tair-*/logs/*
         echo
-        tair.start
+        $DPP tair.start
         ;;
 
-    ccb.status)
+    stop)
+        $DPP azkaban.stop   ; echo
+        $DPP tair.stop      ; echo
+        $DPP sqoop.stop     ; echo
+        $DPP hive.stop      ; echo
+        $DPP hadoop.stop    ; echo
+        $DPP zookeeper.stop ; echo
+        $DPP mysql.stop     ; echo
+        ;;
+    start)
+        $DPP mysql.start    ; echo
+        $DPP zookeeper.start; echo
+        $DPP hadoop.start   ; echo
+        $DPP hive.start     ; echo
+        $DPP sqoop.start    ; echo
+        $DPP tair.start     ; echo
+        $DPP azkaban.start  ; echo
+        ;;
+    restart)
+        $DPP stop
+        $DPP start
+        echo
+        $DPP status
+        ;;
+
+    status)
         echo "=== MySQL ==="
         ps -eo 'pid,args' | grep [m]ysqld | sed -e 's/--[^ ]* //g'
+        echo
+        echo "=== zookeeper:QuorumPeerMain ==="
+        jps -m | grep zoo
         echo
         echo "=== DataNode NameNode NodeManager ResourceManager & JobHistoryServer ==="
         jps | grep -E 'Node|Manager|JobHistory' | sort -n
         echo
         echo "=== HWIServer HiveServer2 ==="
-        ps -eo 'pid,args' | grep [R]unJar | sed -e 's/-[DX][^ ]* //g' -e 's@/[^ ]*/@@g'
-        echo
-        echo "=== tair_cfg_svr tair_server ==="
-        ps -eo 'pid,args' | grep '/sbin/[t]air'
+        jps -m | grep [R]unJar | sed -e 's@/[^ ]*/@@'
         echo
         echo "=== sqoop:BootStrap ==="
         jps | grep Bootstrap
         echo
-        echo "=== AzkabanSingleServer ==="
+        echo "=== tair_cfg_svr tair_server ==="
+        ps -eo 'pid,args' | grep '/sbin/[t]air'
+        echo
+        echo "=== AzkabanServer ==="
         jps | grep Azkaban
         ;;
 
-    ccb.preInstall)
-        cd $DIR_SOLO/hadoop_conf
-        cp -v $MODULES/hadoop/hadoop-*/etc/hadoop/*-site.xml .
-        cat > hive-client.conf << EOF
-hive.cluster.mode=N
-hiveserver2.user=sjin
-hiveserver2.url=192.168.99.242:10000
-EOF
-        EVAL cat hive-client.conf
-        ;;
-
+    *) usage; exit 1;;
 esac
 

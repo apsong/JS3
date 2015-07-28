@@ -275,7 +275,8 @@ case "$1" in
         HADOOP_HOME=`ls -d $DPP_HOME/modules/hadoop/hadoop-* | tail -1`
         AZKABAN_EXEC_HOME=`ls -d $DPP_HOME/modules/AzkabanExecServer/azkaban-executor-* | tail -1`
         cat <<EOF
-export PATH=$DPP_HOME/util:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:\$PATH
+[ -z "\$PATH_DPP_BAK" ] && export PATH_DPP_BAK=\$PATH
+export PATH=$DPP_HOME/util:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:\$PATH_DPP_BAK
 alias .hadoop='cd $HADOOP_HOME; ls'
 alias .hadoop.etc='cd $HADOOP_HOME/etc/hadoop; ls'
 alias .yarn.log='cd $DPP_HOME/modules/hadoop/storage/tmp/nodemanager/logs; ls'

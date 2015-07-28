@@ -14,7 +14,7 @@ EVAL()
 DPP_HOME=$PWD
 while [ 1 ]; do
     [ "$DPP_HOME" = "/" ] && { echo 1>&2 "Error: Incorrect work dir: cannot find DPP_HOME"; exit 1;} 
-    [ -d "$DPP_HOME/modules" ] && break
+    [ -d "$DPP_HOME/modules" -a -f "$DPP_HOME/service.sh" ] && break
     DPP_HOME=`dirname $DPP_HOME`
 done
 
@@ -269,6 +269,29 @@ case "$1" in
         echo
         echo "=== AzkabanServer ==="
         jps | grep Azkaban
+        ;;
+
+    env)
+        HADOOP_HOME=`ls -d $DPP_HOME/modules/hadoop/hadoop-* | tail -1`
+        AZKABAN_EXEC_HOME=`ls -d $DPP_HOME/modules/AzkabanExecServer/azkaban-executor-* | tail -1`
+        cat <<EOF
+export PATH=$DPP_HOME/util:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:\$PATH
+alias .hadoop='cd $HADOOP_HOME; ls'
+alias .hadoop.etc='cd $HADOOP_HOME/etc/hadoop; ls'
+alias .yarn.log='cd $DPP_HOME/modules/hadoop/storage/tmp/nodemanager/logs; ls'
+alias .workflow='cd $DPP_HOME/workflows; cd ccb; ls'
+function .azkaban.exec.latest()
+{
+    local _execid=\$(ls -t $AZKABAN_EXEC_HOME/executions | head -1)
+    [ -n "\$1" ] && local _execid=\$1
+    local _newdir=\$(pwd | sed -e "s^/executions/[0-9]\+^/executions/\$_execid^")
+    if [ "\$_newdir" = "\$PWD" ]; then
+        cd $AZKABAN_EXEC_HOME/executions/\$_execid; ls
+    else
+        cd \$_newdir; ls
+    fi
+}
+EOF
         ;;
 
     *) usage; exit 1;;

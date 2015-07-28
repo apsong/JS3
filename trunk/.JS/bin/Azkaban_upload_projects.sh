@@ -1,1 +1,0 @@
-/home/sjin/.gitddp/DataPentamixDistribution/modules/AzkabanSoloServer/util/ccb_upload_projects.sh

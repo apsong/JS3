@@ -1,0 +1,56 @@
+#!/bin/bash
+set -e -o pipefail
+
+PROGRAM=`basename $0`
+
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <BEGIN> #######################
+EVAL()
+{
+    echo "#!CMD:[" $@ "]"
+    eval "$@"
+}
+
+NEWFILE()
+{
+    FILE=$1; [ -z "$FILE" ] && { echo 1>&2 "($PROGRAM:NEWFILE)Error: FILE is not set"; exit 100;}
+
+    REAL_FILE=.$FILE/`date "+%Y%m%d-%H%M%S"`#$FILE
+
+    mkdir -p .$FILE || exit 101
+    if [ -h $FILE ]; then
+rm -f $FILE
+    elif [ -e $FILE ]; then
+echo 1>&2 "($PROGRAM:NEWFILE)Note: '$FILE' exists and is not a symbolic file. Renamed to '$REAL_FILE.bak'"
+        mv $FILE $REAL_FILE.bak
+    fi
+touch $REAL_FILE && ln -s $REAL_FILE $FILE && echo $REAL_FILE || exit 102
+}
+##################### .JS/bin/_SH_UTIL_FUNCTIONS <END> #########################
+
+usage()
+{
+    echo 1>&2 "Usage: $PROGRAM cat /proc/stat"
+}
+TMP=$PROGRAM.`echo $@ | sed -e 's/[^0-9A-Za-z_-]/./g'`.tmp
+TMP=`echo $TMP | sed -e 's/\.\+/./g'`
+[ ! -f $TMP ] && { "$@" > $TMP; exit 0;}
+"$@" > $TMP.2
+cat $TMP.2 | awk -v TMPFILE=$TMP '{
+    getline _LAST <TMPFILE
+    #print
+    #print _LAST
+    split(_LAST, LAST)
+    OUT=""
+    if (NF>12) SEP=" "; else SEP="\t";
+    for (i=1; i<=NF; i++) {
+        if ($i == LAST[i]) OUT=OUT SEP $i
+        else {
+            d=$i-LAST[i]
+            OUT=OUT SEP sprintf("%+d", d)
+        }
+    }
+    sub(/[\t ]/, "", OUT)
+    print OUT
+}'
+mv $TMP.2 $TMP
+

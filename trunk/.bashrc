@@ -1,8 +1,8 @@
 [ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_functions ##########"
 source $HOME/.bash_functions
-[ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_ds_functions #######"
-source $HOME/.bash_ds_functions
-source $HOME/.bash_ccb_functions
+#[ -z "$SSH_CLIENT" ] && echo "########## source $HOME/.bash_ds_functions #######"
+#source $HOME/.bash_ds_functions
+#source $HOME/.bash_ccb_functions
 
 export PS1="[\u@\h]\w> "
 export JAVA_HOME=/opt/jdk
@@ -12,6 +12,7 @@ export PATH=/opt/mysql/bin:$PATH
 export PATH=/opt/pypy3/bin:$PATH
 export PATH=$HOME/.bin:$PATH
 export PATH=/MINE/hadoop-2.6.0/bin:$PATH
+_PATH_refine
 
 [ "$HOSTNAME" != "jinsong" ] && export LANG=C
 
@@ -24,23 +25,6 @@ alias tea='cd $HOME/.JS/tea'
 alias py='cd $HOME/.JS/py'
 alias vi='vim'
 alias jp='underscore print --color'
-
-####################### reset PATH ###########################
-_PATH=
-IFS=:
-for P in $PATH; do
-_EXIST=0
-    for _P in $_PATH; do
-if [ "$P" = "$_P" ]; then
-_EXIST=1; break
-fi
-done
-if [ "$_EXIST" -ne 1 ]; then
-_PATH="$_PATH:$P"
-    fi
-done
-unset IFS
-export PATH="$_PATH"
 
 unset TZ
 ulimit -c unlimited

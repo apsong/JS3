@@ -274,7 +274,7 @@ case "$1" in
     env)
         HADOOP_HOME=`ls -d $DPP_HOME/modules/hadoop/hadoop-* | tail -1`
         AZKABAN_EXEC_HOME=`ls -d $DPP_HOME/modules/AzkabanExecServer/azkaban-executor-* | tail -1`
-        cat <<EOF
+        cat > /tmp/DPP.env <<EOF
 [ -z "\$PATH_DPP_BAK" ] && export PATH_DPP_BAK=\$PATH
 export PATH=$DPP_HOME/util:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:\$PATH_DPP_BAK
 alias .hadoop='cd $HADOOP_HOME; ls'
@@ -293,6 +293,7 @@ function .azkaban.exec.latest()
     fi
 }
 EOF
+    EVAL cat /tmp/DPP.env
         ;;
 
     *) usage; exit 1;;

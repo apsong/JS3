@@ -1,3 +1,4 @@
+#!/bin/bash
 go()
 {
     if [ $# -eq 0 ]; then
@@ -24,21 +25,20 @@ tryalias()
 {
     [ "$1" = tryalias ] && { echo "Error: Cannot tryalias to itself!" 1>&2; return;}
 
-    IFS=:
+    local IFS=:
     for p in $PATH; do
         [ -f "$p/$2" ] && { alias $1=$2; break;}
     done
-    unset IFS
 }
 tryalias vi vim
 tryalias more less
 tryalias mail mailx
 
-DIR_STACK_LENGTH=20
-DIR_STACK_BASE=0
-DIR_STACK_CUR=0
-DIR_STACK_TOP=0
-DIR_STACK_DEBUG=0
+_DIR_STACK_LENGTH=20
+_DIR_STACK_BASE=0
+_DIR_STACK_CUR=0
+_DIR_STACK_TOP=0
+_DIR_STACK_DEBUG=0
 builtin_cd()
 {
     if [ -z "$1" ]; then
@@ -49,7 +49,7 @@ builtin_cd()
 }
 cd()
 {
-    TD=""
+    local TD=""
     for ARG; do
         case "$ARG" in
             /*) TD="$ARG";;
@@ -59,54 +59,54 @@ cd()
 
     case "$TD" in
         "-")
-            if [ "${DIR_STACK[$DIR_STACK_CUR]}" != "$PWD" ]; then
-                builtin_cd "${DIR_STACK[$DIR_STACK_CUR]}"
-                [ $DIR_STACK_DEBUG -eq 1 ] && cd @
+            if [ "${_DIR_STACK[$_DIR_STACK_CUR]}" != "$PWD" ]; then
+                builtin_cd "${_DIR_STACK[$_DIR_STACK_CUR]}"
+                [ $_DIR_STACK_DEBUG -eq 1 ] && cd @
                 return 0
             fi
-            if [ $DIR_STACK_CUR -eq `expr \( $DIR_STACK_BASE + 1 \) % $DIR_STACK_LENGTH` ]; then
-                echo "Error: Already reach the DIR_STACK_BASE!" 1>&2
+            if [ $_DIR_STACK_CUR -eq `expr \( $_DIR_STACK_BASE + 1 \) % $_DIR_STACK_LENGTH` ]; then
+                echo "Error: Already reach the _DIR_STACK_BASE!" 1>&2
                 return 1
             fi
-            DIR_STACK_CUR=`expr \( $DIR_STACK_CUR + $DIR_STACK_LENGTH - 1 \) % $DIR_STACK_LENGTH`
-            builtin_cd "${DIR_STACK[$DIR_STACK_CUR]}"
-            [ $DIR_STACK_DEBUG -eq 1 ] && cd @
+            _DIR_STACK_CUR=`expr \( $_DIR_STACK_CUR + $_DIR_STACK_LENGTH - 1 \) % $_DIR_STACK_LENGTH`
+            builtin_cd "${_DIR_STACK[$_DIR_STACK_CUR]}"
+            [ $_DIR_STACK_DEBUG -eq 1 ] && cd @
             ;;
         "+")
-            if [ $DIR_STACK_CUR -eq $DIR_STACK_TOP ]; then
-                echo "Error: Already reach the DIR_STACK_TOP!" 1>&2
+            if [ $_DIR_STACK_CUR -eq $_DIR_STACK_TOP ]; then
+                echo "Error: Already reach the _DIR_STACK_TOP!" 1>&2
                 return 1
             fi
-            DIR_STACK_CUR=`expr \( $DIR_STACK_CUR + 1 \) % $DIR_STACK_LENGTH`
-            builtin_cd "${DIR_STACK[$DIR_STACK_CUR]}"
-            [ $DIR_STACK_DEBUG -eq 1 ] && cd @
+            _DIR_STACK_CUR=`expr \( $_DIR_STACK_CUR + 1 \) % $_DIR_STACK_LENGTH`
+            builtin_cd "${_DIR_STACK[$_DIR_STACK_CUR]}"
+            [ $_DIR_STACK_DEBUG -eq 1 ] && cd @
             ;;
         "!")
-            if [ $DIR_STACK_DEBUG -eq 1 ]; then
-                DIR_STACK_DEBUG=0
-                echo "DIR_STACK_DEBUG is off."
+            if [ $_DIR_STACK_DEBUG -eq 1 ]; then
+                _DIR_STACK_DEBUG=0
+                echo "_DIR_STACK_DEBUG is off."
             else
-                DIR_STACK_DEBUG=1
-                echo "DIR_STACK_DEBUG is on."
+                _DIR_STACK_DEBUG=1
+                echo "_DIR_STACK_DEBUG is on."
                 cd @
             fi
             ;;
         @*)
             INDEX="${1:1}"
             if [ -z "$INDEX" ]; then #1. No index => Dump current stack
-                #echo " TOP: $DIR_STACK_TOP"
-                #echo " CURRENT: $DIR_STACK_CUR"
-                #echo " BASE: `expr \( $DIR_STACK_BASE + 1 \) % $DIR_STACK_LENGTH`"
-                [ $DIR_STACK_BASE -eq $DIR_STACK_TOP ] && return
-                i=$DIR_STACK_BASE
-                while [ $i -ne $DIR_STACK_TOP ]; do
-                    j=`expr \( $i + 1 \) % $DIR_STACK_LENGTH`
-                    if [ $j -eq $DIR_STACK_CUR ]; then
-                        echo -e " @ $j:\t${DIR_STACK[$j]}"
+                #echo " TOP: $_DIR_STACK_TOP"
+                #echo " CURRENT: $_DIR_STACK_CUR"
+                #echo " BASE: `expr \( $_DIR_STACK_BASE + 1 \) % $_DIR_STACK_LENGTH`"
+                [ $_DIR_STACK_BASE -eq $_DIR_STACK_TOP ] && return
+                i=$_DIR_STACK_BASE
+                while [ $i -ne $_DIR_STACK_TOP ]; do
+                    j=`expr \( $i + 1 \) % $_DIR_STACK_LENGTH`
+                    if [ $j -eq $_DIR_STACK_CUR ]; then
+                        echo -e " @ $j:\t${_DIR_STACK[$j]}"
                     else
-                        echo -e " $j:\t${DIR_STACK[$j]}"
+                        echo -e " $j:\t${_DIR_STACK[$j]}"
                     fi
-                    i=`expr \( $i + 1 \) % $DIR_STACK_LENGTH`
+                    i=`expr \( $i + 1 \) % $_DIR_STACK_LENGTH`
                 done
             elif [ "$INDEX" = "S" ]; then #2. @S => Save current stack into file
                 cd @ > ~/.cd_history
@@ -122,37 +122,63 @@ cd()
                     echo " #!CMD:[cd $dir]"
                     cd $dir
                 done
-            elif [ $DIR_STACK_BASE -le $DIR_STACK_TOP -a $DIR_STACK_BASE -le $INDEX -a $INDEX -le $DIR_STACK_TOP ] ||
-                [ $DIR_STACK_BASE -gt $DIR_STACK_TOP -a \( \( 0 -le $INDEX -a $INDEX -le $DIR_STACK_TOP \) -o \( $DIR_STACK_BASE -le $INDEX -a $INDEX -lt $DIR_STACK_LENGTH \) \) ]; then #4. Valid index => GOTO it
-                DIR_STACK_CUR=$INDEX
-                builtin_cd "${DIR_STACK[$DIR_STACK_CUR]}"
-                [ $DIR_STACK_DEBUG -eq 1 ] && cd @
+            elif [ $_DIR_STACK_BASE -le $_DIR_STACK_TOP -a $_DIR_STACK_BASE -le $INDEX -a $INDEX -le $_DIR_STACK_TOP ] ||
+                [ $_DIR_STACK_BASE -gt $_DIR_STACK_TOP -a \( \( 0 -le $INDEX -a $INDEX -le $_DIR_STACK_TOP \) -o \( $_DIR_STACK_BASE -le $INDEX -a $INDEX -lt $_DIR_STACK_LENGTH \) \) ]; then #4. Valid index => GOTO it
+                _DIR_STACK_CUR=$INDEX
+                builtin_cd "${_DIR_STACK[$_DIR_STACK_CUR]}"
+                [ $_DIR_STACK_DEBUG -eq 1 ] && cd @
             else #5. Invalid index => Error message
-                echo "Error: Invalid DIR_STACK_INDEX:[$INDEX]!" 1>&2
+                echo "Error: Invalid _DIR_STACK_INDEX:[$INDEX]!" 1>&2
                 cd @
             fi
             ;;
         *)
-            builtin_cd "$TD" || { [ $DIR_STACK_DEBUG -eq 1 ] && cd @; return;}
+            builtin_cd "$TD" || { [ $_DIR_STACK_DEBUG -eq 1 ] && cd @; return;}
             case "$PWD" in
-                ${DIR_STACK[$DIR_STACK_CUR]}|/|$HOME)
-                    [ $DIR_STACK_DEBUG -eq 1 ] &&
-                        { echo " Note: Same dir, root dir, home dir won't be pushed into DIR_STACK."; cd @;}
+                ${_DIR_STACK[$_DIR_STACK_CUR]}|/|$HOME)
+                    [ $_DIR_STACK_DEBUG -eq 1 ] &&
+                        { echo " Note: Same dir, root dir, home dir won't be pushed into _DIR_STACK."; cd @;}
                     return
                     ;;
             esac
 
-            if [ "${DIR_STACK[$DIR_STACK_TOP]}" = "$PWD" ]; then
-                DIR_STACK_CUR=$DIR_STACK_TOP
+            if [ "${_DIR_STACK[$_DIR_STACK_TOP]}" = "$PWD" ]; then
+                _DIR_STACK_CUR=$_DIR_STACK_TOP
             else
-                DIR_STACK_TOP=`expr \( $DIR_STACK_TOP + 1 \) % $DIR_STACK_LENGTH`
-                DIR_STACK_CUR=$DIR_STACK_TOP
-                DIR_STACK[$DIR_STACK_CUR]="$PWD"
-                [ $DIR_STACK_TOP -eq $DIR_STACK_BASE ] &&
-                    DIR_STACK_BASE=`expr \( $DIR_STACK_BASE + 1 \) % $DIR_STACK_LENGTH`
+                _DIR_STACK_TOP=`expr \( $_DIR_STACK_TOP + 1 \) % $_DIR_STACK_LENGTH`
+                _DIR_STACK_CUR=$_DIR_STACK_TOP
+                _DIR_STACK[$_DIR_STACK_CUR]="$PWD"
+                [ $_DIR_STACK_TOP -eq $_DIR_STACK_BASE ] &&
+                    _DIR_STACK_BASE=`expr \( $_DIR_STACK_BASE + 1 \) % $_DIR_STACK_LENGTH`
             fi
-            [ $DIR_STACK_DEBUG -eq 1 ] && cd @
+            [ $_DIR_STACK_DEBUG -eq 1 ] && cd @
             ;;
     esac
 }
 
+
+####################### reset PATH ###########################
+_PATH_refine() {
+    local P _P _PATH= IFS=:
+    for P in $PATH; do
+        for _P in $_PATH; do
+            [ "$P" = "$_P" ] && continue 2  #P already exists in _PATH, continue with next P
+        done
+        _PATH="$_PATH:$P"
+    done
+    export PATH="$_PATH"
+}
+_PATH_insert() {
+    local D _PATH=
+    for D; do
+        _PATH=$_PATH:$D
+    done
+    export PATH=$_PATH:$PATH
+    _PATH_refine
+}
+
+unset TZ
+ulimit -c unlimited
+ulimit -u 10240
+
+export MAVEN_OPTS="-Dmaven.artifact.threads=10 -Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"

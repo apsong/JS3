@@ -156,8 +156,6 @@ cd()
     esac
 }
 
-
-####################### reset PATH ###########################
 _PATH_refine() {
     local P _P _PATH= IFS=:
     for P in $PATH; do
@@ -177,8 +175,3 @@ _PATH_insert() {
     _PATH_refine
 }
 
-unset TZ
-ulimit -c unlimited
-ulimit -u 10240
-
-export MAVEN_OPTS="-Dmaven.artifact.threads=10 -Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"

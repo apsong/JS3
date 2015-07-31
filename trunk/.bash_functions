@@ -164,7 +164,7 @@ _PATH_refine() {
         done
         _PATH="$_PATH:$P"
     done
-    export PATH="$_PATH"
+    export PATH="${_PATH/:/}"
 }
 _PATH_insert() {
     local D _PATH=

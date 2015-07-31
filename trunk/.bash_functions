@@ -162,9 +162,9 @@ _PATH_refine() {
         for _P in $_PATH; do
             [ "$P" = "$_P" ] && continue 2  #P already exists in _PATH, continue with next P
         done
-        _PATH="$_PATH:$P"
+        [ -z "$_PATH" ] && _PATH="$P" || _PATH="$_PATH:$P"
     done
-    export PATH="${_PATH/:/}"
+    export PATH="$_PATH"
 }
 _PATH_insert() {
     local D _PATH=

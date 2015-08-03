@@ -249,38 +249,85 @@ case "$1" in
         ;;
 
     status)
-        echo "=== MySQL ==="
-        ps -eo 'pid,args' | grep [m]ysqld | sed -e 's/--[^ ]* //g'
+        if [ -d $MODULES/mysql ]; then
+            echo "=== MySQL ==="
+            ps -eo 'pid,args' | grep [m]ysqld | sed -e 's/--[^ ]* //g'
+            echo
+        fi
+        if [ -d $MODULES/zookeeper ]; then
+            echo "=== zookeeper:QuorumPeerMain ==="
+            jps -m | grep zoo
+            echo
+        fi
+        if [ -d $MODULES/hadoop ]; then
+            echo "=== DataNode NameNode NodeManager ResourceManager & JobHistoryServer ==="
+            jps | grep -E 'Node|Manager|JobHistory' | sort -n
+            echo
+        fi
+        if [ -d  $MODULES/hive ]; then
+            echo "=== HWIServer HiveServer2 ==="
+            jps -m | sed -e 's@/[^ ]*/@@' | grep [R]unJar
+            echo
+        fi
+        if [ -d  $MODULES/hbase ]; then
+            echo "=== HMaster HRegionServer ==="
+            jps -m | sort -k 2 | grep -E 'HMaster|HRegionServer'
+            echo
+        fi
+        if [ -d  $MODULES/sqoop ]; then
+            echo "=== sqoop:BootStrap ==="
+            jps | grep Bootstrap
+        fi
         echo
-        echo "=== zookeeper:QuorumPeerMain ==="
-        jps -m | grep zoo
-        echo
-        echo "=== DataNode NameNode NodeManager ResourceManager & JobHistoryServer ==="
-        jps | grep -E 'Node|Manager|JobHistory' | sort -n
-        echo
-        echo "=== HWIServer HiveServer2 ==="
-        jps -m | grep [R]unJar | sed -e 's@/[^ ]*/@@'
-        echo
-        echo "=== sqoop:BootStrap ==="
-        jps | grep Bootstrap
-        echo
-        echo "=== tair_cfg_svr tair_server ==="
-        ps -eo 'pid,args' | grep '/sbin/[t]air'
-        echo
-        echo "=== AzkabanServer ==="
-        jps | grep Azkaban
+        if [ -d  $MODULES/tair ]; then
+            echo "=== tair_cfg_svr tair_server ==="
+            ps -eo 'pid,args' | grep '/sbin/[t]air'
+            echo
+        fi
+        for AS in AzkabanWeb AzkabanExec AzkabanSolo; do
+            if [ -d  $MODULES/${AS}Server ]; then
+                echo "=== ${AS}Server ==="
+                jps | grep $AS.*Server
+            fi
+        done
+        ;;
+
+    sync)
+        for H in `cat $DPP_HOME/slaves.properties`; do
+            [ `ifconfig | grep -c $H` -gt 0 ] && continue
+            echo "#[ scp: $H ]"
+            shift
+            if [ $# -eq 0 ]; then
+                scp -r $DPP_HOME/util $H:$DPP_HOME
+            else
+                for D; do
+                    case "$D" in
+                        /*) scp -r "$D" $H:     ;;
+                        *)  scp -r "$D" `dirname $H:$PWD/$D` ;;
+                    esac
+                done
+            fi
+        done
         ;;
 
     env)
-        HADOOP_HOME=`ls -d $DPP_HOME/modules/hadoop/hadoop-* | tail -1`
-        AZKABAN_EXEC_HOME=`ls -d $DPP_HOME/modules/AzkabanExecServer/azkaban-executor-* | tail -1`
-        cat > /tmp/DPP.env <<EOF
-[ -z "\$PATH_DPP_BAK" ] && export PATH_DPP_BAK=\$PATH
-export PATH=$DPP_HOME/util:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:\$PATH_DPP_BAK
-alias .hadoop='cd $HADOOP_HOME; ls'
-alias .hadoop.etc='cd $HADOOP_HOME/etc/hadoop; ls'
-alias .yarn.log='cd $DPP_HOME/modules/hadoop/storage/tmp/nodemanager/logs; ls'
-alias .workflow='cd $DPP_HOME/workflows; cd ccb; ls'
+        DPP_ENV=/tmp/DPP.env
+        >$DPP_ENV
+        echo >>$DPP_ENV '[ -z "$PATH_DPP_BAK" ] && export PATH_DPP_BAK=$PATH'
+        echo >>$DPP_ENV "export DPP_PATH=$DPP_HOME/util:$DPP_HOME/installer/jdk/bin"
+        echo >>$DPP_ENV "alias .workflow='cd $DPP_HOME/workflows; cd ccb; ls'"
+
+        HADOOP_HOME=`find $MODULES/hadoop -maxdepth 1 -type d -name "hadoop-*" | tail -1`
+        if [ -n "$HADOOP_HOME" ]; then
+            echo >>$DPP_ENV "alias .hadoop='cd $HADOOP_HOME; ls'"
+            echo >>$DPP_ENV "alias .hadoop.etc='cd $HADOOP_HOME/etc/hadoop; ls'"
+            echo >>$DPP_ENV "alias .yarn.log='cd $MODULES/hadoop/storage/tmp/nodemanager/logs; ls'"
+            echo >>$DPP_ENV "export DPP_PATH=\$DPP_PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin"
+        fi
+
+        AZKABAN_EXEC_HOME=`find $MODULES -maxdepth 2 -type d -name "azkaban-executor-*" | tail -1`
+        if [ -n "$AZKABAN_EXEC_HOME" ]; then
+            cat >>$DPP_ENV <<EOF
 function .azkaban.exec.latest()
 {
     local _execid=\$(ls -t $AZKABAN_EXEC_HOME/executions | head -1)
@@ -293,7 +340,11 @@ function .azkaban.exec.latest()
     fi
 }
 EOF
-    EVAL cat /tmp/DPP.env
+        fi
+
+        echo >>$DPP_ENV 'export PATH=$DPP_PATH:$PATH_DPP_BAK'
+        echo >>$DPP_ENV ". $DPP_HOME/util/.bash_functions"
+        EVAL cat $DPP_ENV
         ;;
 
     *) usage; exit 1;;

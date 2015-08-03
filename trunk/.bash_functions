@@ -169,9 +169,12 @@ _PATH_refine() {
 _PATH_insert() {
     local D _PATH=
     for D; do
-        _PATH=$_PATH:$D
+        [ -d "$D" ] && _PATH=$_PATH:$D
     done
     export PATH=$_PATH:$PATH
     _PATH_refine
 }
 
+_PATH_refine
+[ -z "$GREP_OPTIONS" ] && export GREP_OPTIONS=--color=auto
+export PS1='[\u@\h]\w> '

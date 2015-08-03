@@ -314,7 +314,7 @@ case "$1" in
         DPP_ENV=/tmp/DPP.env
         >$DPP_ENV
         echo >>$DPP_ENV '[ -z "$PATH_DPP_BAK" ] && export PATH_DPP_BAK=$PATH'
-        echo >>$DPP_ENV "export DPP_PATH=$DPP_HOME/util:$DPP_HOME/installer/jdk/bin"
+        echo >>$DPP_ENV "export DPP_PATH=$DPP_HOME:$DPP_HOME/util"
         echo >>$DPP_ENV "alias .workflow='cd $DPP_HOME/workflows; cd ccb; ls'"
 
         HADOOP_HOME=`find $MODULES/hadoop -maxdepth 1 -type d -name "hadoop-*" | tail -1`

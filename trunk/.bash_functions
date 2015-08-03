@@ -155,6 +155,7 @@ cd()
             ;;
     esac
 }
+cd $PWD
 
 _PATH_refine() {
     local P _P _PATH= IFS=:
@@ -174,7 +175,7 @@ _PATH_insert() {
     export PATH=$_PATH:$PATH
     _PATH_refine
 }
-
 _PATH_refine
+
 [ -z "$GREP_OPTIONS" ] && export GREP_OPTIONS=--color=auto
 export PS1='[\u@\h]\w> '

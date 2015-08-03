@@ -250,7 +250,7 @@ case "$1" in
 
     status)
         if [ -d $MODULES/mysql ]; then
-            echo "=== MySQL ==="
+            echo "=== mysql ==="
             ps -eo 'pid,args' | grep [m]ysqld | sed -e 's/--[^ ]* //g'
             echo
         fi
@@ -265,12 +265,12 @@ case "$1" in
             echo
         fi
         if [ -d  $MODULES/hive ]; then
-            echo "=== HWIServer HiveServer2 ==="
+            echo "=== hive:HWIServer HiveServer2 ==="
             jps -m | sed -e 's@/[^ ]*/@@' | grep [R]unJar
             echo
         fi
         if [ -d  $MODULES/hbase ]; then
-            echo "=== HMaster HRegionServer ==="
+            echo "=== hbase:HMaster HRegionServer ==="
             jps -m | sort -k 2 | grep -E 'HMaster|HRegionServer'
             echo
         fi
@@ -313,8 +313,8 @@ case "$1" in
     env)
         DPP_ENV=/tmp/DPP.env
         >$DPP_ENV
-        echo >>$DPP_ENV '[ -z "$PATH_DPP_BAK" ] && export PATH_DPP_BAK=$PATH'
-        echo >>$DPP_ENV "export DPP_PATH=$DPP_HOME:$DPP_HOME/util"
+        echo >>$DPP_ENV '[ -z "$PATH_DPP_BAK" ] && PATH_DPP_BAK=$PATH'
+        echo >>$DPP_ENV "DPP_PATH=$DPP_HOME:$DPP_HOME/util"
         echo >>$DPP_ENV "alias .workflow='cd $DPP_HOME/workflows; cd ccb; ls'"
 
         HADOOP_HOME=`find $MODULES/hadoop -maxdepth 1 -type d -name "hadoop-*" | tail -1`
@@ -322,7 +322,7 @@ case "$1" in
             echo >>$DPP_ENV "alias .hadoop='cd $HADOOP_HOME; ls'"
             echo >>$DPP_ENV "alias .hadoop.etc='cd $HADOOP_HOME/etc/hadoop; ls'"
             echo >>$DPP_ENV "alias .yarn.log='cd $MODULES/hadoop/storage/tmp/nodemanager/logs; ls'"
-            echo >>$DPP_ENV "export DPP_PATH=\$DPP_PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin"
+            echo >>$DPP_ENV "DPP_PATH=\$DPP_PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin"
         fi
 
         AZKABAN_EXEC_HOME=`find $MODULES -maxdepth 2 -type d -name "azkaban-executor-*" | tail -1`
@@ -342,7 +342,7 @@ function .azkaban.exec.latest()
 EOF
         fi
 
-        echo >>$DPP_ENV 'export PATH=$DPP_PATH:$PATH_DPP_BAK'
+        echo >>$DPP_ENV 'export PATH=$DPP_PATH:$PATH_DPP_BAK; unset DPP_PATH'
         echo >>$DPP_ENV ". $DPP_HOME/util/.bash_functions"
         EVAL cat $DPP_ENV
         ;;

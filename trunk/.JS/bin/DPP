@@ -19,6 +19,7 @@ while [ 1 ]; do
 done
 
 MODULES=$DPP_HOME/modules
+JPS=$DPP_HOME/jps
 
 LANG=zh_CN.UTF-8
 LC_ALL=zh_CN.UTF-8
@@ -36,7 +37,9 @@ usage()
     echo 1>&2 "       DPP azkaban.{start|stop|restart}"
     echo 1>&2 "       DPP tair.{start|stop|restart}"
     echo 1>&2 "       DPP {start|stop|restart}"
-    echo 1>&2 "       DPP status"
+    echo 1>&2 "       DPP status[.all]"
+    echo 1>&2 "       DPP sync"
+    echo 1>&2 "       DPP env"
 }
 
 namenode_safe_mode_off()
@@ -61,7 +64,7 @@ case "$1" in
         EVAL "cd $MODULES/hadoop/ && ./node_daemon.sh start -all && cd -"
         namenode_safe_mode_off || echo 1>& "Error: namenode doesn't leave Safe mode after 60 seconds..."
         echo
-        EVAL "jps | grep -E 'Node\>'"
+        EVAL "$JPS | grep -E 'Node\>'"
         ;;
     hadoop.hdfs.restart)
         $DPP hadoop.hdfs.stop
@@ -76,7 +79,7 @@ case "$1" in
     hadoop.yarn.start)
         EVAL "cd $MODULES/hadoop/ && ./yarn_daemon.sh start -all && cd -"
         echo
-        EVAL "jps | grep -E 'Manager'"
+        EVAL "$JPS | grep -E 'Manager'"
         ;;
     hadoop.yarn.restart)
         $DPP hadoop.yarn.stop
@@ -91,7 +94,7 @@ case "$1" in
     hadoop.jobhistory.start)
         EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh start -jobhistory && cd -"
         echo
-        EVAL "jps | grep -E 'JobHistoryServer'"
+        EVAL "$JPS | grep -E 'JobHistoryServer'"
         ;;
     hadoop.jobhistory.restart)
         $DPP hadoop.jobhistory.stop
@@ -111,7 +114,7 @@ case "$1" in
         EVAL "cd $MODULES/hadoop/ && ./mr_daemon.sh start -jobhistory && cd -"
         EVAL "cd $MODULES/hadoop/ && ./yarn_daemon.sh start -all && cd -"
         echo
-        EVAL "jps | grep -E 'Node|Manager|JobHistoryServer' | sort -n"
+        EVAL "$JPS | grep -E 'Node|Manager|JobHistoryServer' | sort -n"
         ;;
     hadoop.restart)
         $DPP hadoop.stop
@@ -127,7 +130,7 @@ case "$1" in
         EVAL "cd $MODULES/hive/ && ./startServer.sh all && cd -"
         echo
         sleep 1
-        EVAL "jps -m | grep [R]unJar | sed -e 's@/[^ ]*/@@'"
+        EVAL "$JPS -m | grep [R]unJar | sed -e 's@/[^ ]*/@@'"
         ;;
     hive.restart)
         $DPP hive.stop
@@ -160,7 +163,7 @@ case "$1" in
         EVAL "cd $MODULES/zookeeper/ && ./startServer.sh && cd -"
         sleep 1
         echo
-        EVAL "jps -m | grep zoo"
+        EVAL "$JPS -m | grep zoo"
         ;;
     zookeeper.restart)
         $DPP zookeeper.stop
@@ -173,14 +176,14 @@ case "$1" in
         for D in `find $MODULES -maxdepth 1 -type d -name "Azkaban*Server"`; do
             EVAL "cd $D && ./stopServer.sh && cd -"
         done
-        jps | awk '/Azkaban.*Server/{system("kill " $1);}'
+        $JPS | awk '/Azkaban.*Server/{system("kill " $1);}'
         ;;
     azkaban.start)
         for D in `find $MODULES -maxdepth 1 -type d -name "Azkaban*Server"`; do
             EVAL "cd $D && ./startServer.sh && cd -"
         done
         echo
-        EVAL "jps | grep Azkaban"
+        EVAL "$JPS | grep Azkaban"
         ;;
     azkaban.restart)
         $DPP azkaban.stop
@@ -196,7 +199,7 @@ case "$1" in
     sqoop.start)
         EVAL "cd $MODULES/sqoop/ && ./startNode.sh && cd -"
         echo
-        EVAL "jps | grep Bootstrap"
+        EVAL "$JPS | grep Bootstrap"
         ;;
     sqoop.restart)
         $DPP sqoop.stop
@@ -256,29 +259,29 @@ case "$1" in
         fi
         if [ -d $MODULES/zookeeper ]; then
             echo "=== zookeeper:QuorumPeerMain ==="
-            jps -m | grep zoo
+            $JPS -m | grep zoo
             echo
         fi
         if [ -d $MODULES/hadoop ]; then
             echo "=== DataNode NameNode NodeManager ResourceManager & JobHistoryServer ==="
-            jps | grep -E 'Node|Manager|JobHistory' | sort -n
+            $JPS | grep -E 'Node|Manager|JobHistory' | sort -n
             echo
         fi
         if [ -d  $MODULES/hive ]; then
             echo "=== hive:HWIServer HiveServer2 ==="
-            jps -m | sed -e 's@/[^ ]*/@@' | grep [R]unJar
+            $JPS -m | sed -e 's@/[^ ]*/@@' | grep [R]unJar
             echo
         fi
         if [ -d  $MODULES/hbase ]; then
             echo "=== hbase:HMaster HRegionServer ==="
-            jps -m | sort -k 2 | grep -E 'HMaster|HRegionServer'
+            $JPS -m | sort -k 2 | grep -E 'HMaster|HRegionServer'
             echo
         fi
         if [ -d  $MODULES/sqoop ]; then
             echo "=== sqoop:BootStrap ==="
-            jps | grep Bootstrap
+            $JPS | grep Bootstrap
+            echo
         fi
-        echo
         if [ -d  $MODULES/tair ]; then
             echo "=== tair_cfg_svr tair_server ==="
             ps -eo 'pid,args' | grep '/sbin/[t]air'
@@ -287,8 +290,16 @@ case "$1" in
         for AS in AzkabanWeb AzkabanExec AzkabanSolo; do
             if [ -d  $MODULES/${AS}Server ]; then
                 echo "=== ${AS}Server ==="
-                jps | grep $AS.*Server
+                $JPS | grep $AS.*Server
+                HAS_AZKABAN=YES
             fi
+        done; [ "$HAS_AZKABAN" = "YES" ] && echo
+        ;;
+
+    status.all)
+        for H in `cat $DPP_HOME/slaves.properties`; do
+            echo "#[ ssh: $H ]"
+            ssh $H "cd $DPP_HOME; util/DPP status"
         done
         ;;
 
@@ -315,6 +326,7 @@ case "$1" in
         >$DPP_ENV
         echo >>$DPP_ENV '[ -z "$PATH_DPP_BAK" ] && PATH_DPP_BAK=$PATH'
         echo >>$DPP_ENV "DPP_PATH=$DPP_HOME:$DPP_HOME/util"
+        echo >>$DPP_ENV "alias .DPP.env='cd $DPP_HOME; util/DPP env >/dev/null && . $DPP_ENV'"
         echo >>$DPP_ENV "alias .workflow='cd $DPP_HOME/workflows; cd ccb; ls'"
 
         HADOOP_HOME=`find $MODULES/hadoop -maxdepth 1 -type d -name "hadoop-*" | tail -1`
@@ -323,6 +335,17 @@ case "$1" in
             echo >>$DPP_ENV "alias .hadoop.etc='cd $HADOOP_HOME/etc/hadoop; ls'"
             echo >>$DPP_ENV "alias .yarn.log='cd $MODULES/hadoop/storage/tmp/nodemanager/logs; ls'"
             echo >>$DPP_ENV "DPP_PATH=\$DPP_PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin"
+        fi
+
+        HIVE_HOME=`find $MODULES/hive -maxdepth 1 -type d -name "*hive-*" | tail -1`
+        if [ -n "$HIVE_HOME" ]; then
+            echo >>$DPP_ENV "alias .hive='cd $HIVE_HOME; ls'"
+        fi
+
+        HBASE_HOME=`find $MODULES/hbase -maxdepth 1 -type d -name "*hbase-*" | tail -1`
+        if [ -n "$HBASE_HOME" ]; then
+            echo >>$DPP_ENV "alias .hbase='cd $HBASE_HOME; ls'"
+            echo >>$DPP_ENV "DPP_PATH=\$DPP_PATH:$HBASE_HOME/bin"
         fi
 
         AZKABAN_EXEC_HOME=`find $MODULES -maxdepth 2 -type d -name "azkaban-executor-*" | tail -1`
@@ -343,7 +366,7 @@ EOF
         fi
 
         echo >>$DPP_ENV 'export PATH=$DPP_PATH:$PATH_DPP_BAK; unset DPP_PATH'
-        echo >>$DPP_ENV ". $DPP_HOME/util/.bash_functions"
+        echo >>$DPP_ENV "[ -f $DPP_HOME/util/.bash_functions ] && . $DPP_HOME/util/.bash_functions"
         EVAL cat $DPP_ENV
         ;;
 

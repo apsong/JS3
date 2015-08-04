@@ -133,12 +133,12 @@ cd()
             fi
             ;;
         *)
-            builtin_cd "$TD" || { [ $_DIR_STACK_DEBUG -eq 1 ] && cd @; return;}
+            builtin_cd "$TD" || { [ $_DIR_STACK_DEBUG -eq 1 ] && cd @; return 100;}
             case "$PWD" in
                 ${_DIR_STACK[$_DIR_STACK_CUR]}|/|$HOME)
                     [ $_DIR_STACK_DEBUG -eq 1 ] &&
                         { echo " Note: Same dir, root dir, home dir won't be pushed into _DIR_STACK."; cd @;}
-                    return
+                    return 101
                     ;;
             esac
 
@@ -152,6 +152,7 @@ cd()
                     _DIR_STACK_BASE=`expr \( $_DIR_STACK_BASE + 1 \) % $_DIR_STACK_LENGTH`
             fi
             [ $_DIR_STACK_DEBUG -eq 1 ] && cd @
+            return 0
             ;;
     esac
 }

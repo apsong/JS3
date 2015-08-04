@@ -326,10 +326,10 @@ case "$1" in
         >$DPP_ENV
         echo >>$DPP_ENV '[ -z "$PATH_DPP_BAK" ] && PATH_DPP_BAK=$PATH'
         echo >>$DPP_ENV "DPP_PATH=$DPP_HOME:$DPP_HOME/util"
-        echo >>$DPP_ENV "alias .DPP.env='cd $DPP_HOME && util/DPP env >/dev/null && . $DPP_ENV'"
+        echo >>$DPP_ENV "alias .DPP.env='(cd $DPP_HOME && util/DPP env >/dev/null) && . $DPP_ENV'"
         echo >>$DPP_ENV "alias .workflow='cd $DPP_HOME/workflows; cd ccb; ls'"
 
-        HADOOP_HOME=`find $MODULES/hadoop -maxdepth 1 -type d -name "hadoop-*" | tail -1`
+        HADOOP_HOME=`find $MODULES -maxdepth 2 -type d -name "hadoop-*" | tail -1`
         if [ -n "$HADOOP_HOME" ]; then
             echo >>$DPP_ENV "alias .hadoop='cd $HADOOP_HOME; ls'"
             echo >>$DPP_ENV "alias .hadoop.etc='cd $HADOOP_HOME/etc/hadoop; ls'"
@@ -337,12 +337,12 @@ case "$1" in
             echo >>$DPP_ENV "DPP_PATH=\$DPP_PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin"
         fi
 
-        HIVE_HOME=`find $MODULES/hive -maxdepth 1 -type d -name "*hive-*" | tail -1`
+        HIVE_HOME=`find $MODULES -maxdepth 2 -type d -name "*hive-*" | tail -1`
         if [ -n "$HIVE_HOME" ]; then
             echo >>$DPP_ENV "alias .hive='cd $HIVE_HOME; ls'"
         fi
 
-        HBASE_HOME=`find $MODULES/hbase -maxdepth 1 -type d -name "*hbase-*" | tail -1`
+        HBASE_HOME=`find $MODULES -maxdepth 2 -type d -name "hbase-*" | tail -1`
         if [ -n "$HBASE_HOME" ]; then
             echo >>$DPP_ENV "alias .hbase='cd $HBASE_HOME; ls'"
             echo >>$DPP_ENV "DPP_PATH=\$DPP_PATH:$HBASE_HOME/bin"

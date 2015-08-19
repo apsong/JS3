@@ -22,3 +22,4 @@ autocmd BufReadPost *
     \ exe "normal g'\"" |
     \ endif
 
+au BufNewFile,BufRead *.scala       set ft=scala

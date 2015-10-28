@@ -5,18 +5,51 @@ PROGRAM=`basename $0`
 usage()
 {
     echo 1>&2 "Usage: $PROGRAM begin_yyyymmdd end_yyyymmdd"
-    echo 1>&2 " $PROGRAM 20150101 20151231"
+    echo 1>&2 "       $PROGRAM yyyymmdd"
+    echo 1>&2 "       $PROGRAM yyyymm"
+    echo 1>&2 "       $PROGRAM {-|+}n {day|month}"
+    echo 1>&2
+    echo 1>&2 "Sample:"
+    echo 1>&2 "       $PROGRAM 20150101 20151231     [20150101,20151231]"
+    echo 1>&2 "       $PROGRAM 20151028              20150128"
+    echo 1>&2 "       $PROGRAM 201502                [20150201,20150228]"
+    echo 1>&2 "       $PROGRAM -2 day                The day before yesterday"
+    echo 1>&2 "       $PROGRAM -1 month              Last month"
 }
 
-[ $# -ne 2 ] && { usage; exit 1;}
-[ `expr $1 : '[0-9]\+'` -ne 8 ] && { "'$1' should be of format 'yyyymmdd'"; exit 1;}
-[ `expr $2 : '[0-9]\+'` -ne 8 ] && { "'$2' should be of format 'yyyymmdd'"; exit 1;}
-date -d "$1" >/dev/null || exit 1
-date -d "$2" >/dev/null || exit 1
+seq_yyyymm()
+{
+    [ `expr $1 : '[0-9]\+'` -ne 6 ] && { echo 1>&2 "'$1' should be of format 'yyyymmdd'"; usage; exit 1;}
+    DAY=`date -d ${1}01 +%Y%m%d` || exit 1
+    while true; do
+        case $DAY in
+            ${1}*) echo $DAY; DAY=`date -d "$DAY +1 day" +%Y%m%d`;;
+            *)     break;;
+        esac
+    done
+}
 
-END=`date -d "$2" +%Y%m%d`
-DAY=`date -d "$1" +%Y%m%d`
-while [ $DAY -le $END ]; do
-    echo $DAY
-    DAY=`date -d "$DAY +1 day" +%Y%m%d`
-done
+seq_yyyymmdd_yyyymmdd()
+{
+    [ `expr $1 : '[0-9]\+'` -ne 8 ] && { echo 1>&2 "'$1' should be of format 'yyyymmdd'"; usage; exit 1;}
+    [ `expr $2 : '[0-9]\+'` -ne 8 ] && { echo 1>&2 "'$2' should be of format 'yyyymmdd'"; usage; exit 1;}
+    END=`date -d "$2" +%Y%m%d` || exit 1
+    DAY=`date -d "$1" +%Y%m%d` || exit 1
+    while [ $DAY -le $END ]; do
+        echo $DAY; DAY=`date -d "$DAY +1 day" +%Y%m%d`
+    done
+}
+
+case $# in
+    1) case `expr $1 : '[0-9]\+'` in
+            6) seq_yyyymm $1;;
+            8) date -d "$1" +%Y%m%d || exit 1;;
+            *) echo 1>&2 "'$1' should be of format 'yyyymmdd' or 'yyyymm'"; exit 1;;
+       esac ;;
+    2) case "$2" in
+            day)   date -d "$1 $2" +%Y%m%d || exit 1 ;;
+            month) yyyymm=`date -d "$1 $2" +%Y%m` || exit 1; seq_yyyymm $yyyymm ;;
+            *) seq_yyyymmdd_yyyymmdd $1 $2;;
+        esac ;;
+    *) usage; exit 1;;
+esac

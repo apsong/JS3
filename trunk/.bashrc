@@ -12,6 +12,7 @@ export PATH=/opt/mysql/bin:$PATH
 export PATH=/opt/pypy3/bin:$PATH
 export PATH=$HOME/.bin:$PATH
 export PATH=/MINE/hadoop-2.6.0/bin:$PATH
+export PATH=/opt/sbt/bin:$PATH
 _PATH_refine
 
 [ "$HOSTNAME" != "jinsong" ] && export LANG=C

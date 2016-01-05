@@ -32,3 +32,8 @@ ulimit -c unlimited
 ulimit -u 10240
 
 export MAVEN_OPTS="-Dmaven.artifact.threads=10 -Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
+
+
+. /tmp/DPP.env
+.dpp
+. HWClient/bigdata_env
